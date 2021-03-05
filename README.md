@@ -375,8 +375,21 @@ Visualizando dados no display.
 
 Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação rede CAN com BBB e Python <https://www.embarcados.com.br/can-com-beaglebone-black-e-python/>
 
+[1] Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Automotivas – Estudo de Caso. UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL, 2016.
+
+![](figuras/tab_pgn_01.jpg)
+
+![](figuras/tab_pgn_02.jpg)
+
+![](figuras/tab_pgn_03.jpg)
+
+![](figuras/tab_pgn_04.jpg)
 
 
+
+# 4. Protocolo CANOPEN
+
+O motor da WEG VVW500 usa Canopen @ 250000bps e identificação de 11bits.
 
 # Bibliografia
  

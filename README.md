@@ -169,15 +169,15 @@ Há uma vasta documentação técnica sobre o uso do SocketCan em sistemas opera
 
 # 3. Programação do computador de bordo
 
+O computador de bordo tem que monitorar o controlador do motor elétrico e o BMS no barramento CAN de alta prioridade (velocidade).
 
-Vamos primeiramente apresentar a configuração com simulador do controlador do motor e do BMS, onde o OBC tem que monitorar os dados do motor e da bateria e apresentar num painel.
+O computador de bordo (OBC) tem que ser flexivel o bastante para se comunicar com diversos modelos de controladores de motores elétricos e BMS.  
 
-Vamos construir um simulador do controlador do motor e o simulador do BMS em python para testar o protocolo. 
+No caso do BRElétrico, temos um motor de CC brushless do fabricante Guandong que tem uma interface CAN. A documentação deste controlador e motor não é dos melhores, mas pelo menos temos a especificação do protocolo CAN usado pelo controlador. 
 
-
+No projeto da conversão da VAN vamos usar o CVW500 da WEG que também tem uma interface CAN e implementa o protocolo CANOPEN.
 
 ## 3.1. Controlador Motor PM BLDC Guandong
-
 
 Os parametros do Controlador do motor Brushless CC PM BLDC Guandong são mandados por um CAN frame com as seguintes especificações.
 
@@ -227,6 +227,11 @@ Os dados mostram a operação do motor da seguinte maneira:
 0x10098A9E = PDU format 0x09, specific 0x8A, PGN = 2442, source adress = 0x9E
 ```
 
+Para facilitar o desenvolvimento do OBC fizemos uma programa de simulação da comunicação do controlador PM BLDC Guandong em python que está no diretório:
+
+`code_simulador_motor/simularo_motor.py`
+
+[O link para o simulador] (../Computador-de-bordo/code_simulador_motor/simulador_motor.py)
 
 ## 3.2. BMS Battery Management System
 

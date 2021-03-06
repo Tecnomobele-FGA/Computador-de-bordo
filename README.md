@@ -173,16 +173,22 @@ O computador de bordo tem que monitorar o controlador do motor elétrico e o BMS
 
 O computador de bordo (OBC) tem que ser flexivel o bastante para se comunicar com diversos modelos de controladores de motores elétricos e BMS.  
 
-No caso do BRElétrico, temos um motor de CC brushless do fabricante Guandong que tem uma interface CAN. A documentação deste controlador e motor não é dos melhores, mas pelo menos temos a especificação do protocolo CAN usado pelo controlador. 
+No caso do BRElétrico, temos um motor de CC brushless do fabricante Guandong que tem uma interface CAN. A documentação deste controlador e motor não é dos melhores, mas pelo menos temos a especificação do protocolo CAN usado pelo controlador e indica que usa o protocolo J1939 nas camadas superiorers.
 
 No projeto da conversão da VAN vamos usar o CVW500 da WEG que também tem uma interface CAN e implementa o protocolo CANOPEN.
 
+Ainda não temos uma definição qual protocolo de aplicação vamos usar no projeto do Computador de Bordo (OBC). 
+Há a opção de usar J1939 ou CANOPEN. O J1939 tem a vantagem de ser específico para aplicações de mobilidade. 
+
+
 ## 3.1. Controlador Motor PM BLDC Guandong
 
-Os parametros do Controlador do motor Brushless CC PM BLDC Guandong são mandados por um CAN frame com as seguintes especificações.
+Os parametros do Controlador do motor Brushless CC PM BLDC Guandong são mandados por um CAN frame com as seguintes especificações. O fabricante menciona que os protocolos usados são CAN20.0 e J1939
 
 Bus rate: 250kbps
-A taxa de envio é 40 ms mandando 2 mensagens, ou seja uma mensagem a cada 20 ms. 
+
+A taxa de envio é 40 ms mandando 2 mensagens, ou seja uma mensagem a cada 20 ms.
+ 
 O protocolo usa CAN 2.0 com CAN expand frame 29th identifier
 
 A primeira mensagem (*frame*) frame ID code é 0x10088A9E.
@@ -208,7 +214,7 @@ O BYTE 6 com o Running status tem o seguinte formato:
 | reserved | ready for | reserved | reserved | stop | brake | backward | forward|
 
 
-O código de erro no BYTE 7 e 8 (*Fault code instruction*) tem os seguintes formatos 
+O código de erro nos BYTES 7 e 8 (*Fault code instruction*) tem os seguintes formatos 
 
 | BIT7 | BIT6 | BIT5 | BIT4 | BIT3 | BIT2 | BIT1 | BIT0 | 
 |:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
@@ -231,7 +237,32 @@ Para facilitar o desenvolvimento do OBC fizemos uma programa de simulação da c
 
 `code_simulador_motor/simularo_motor.py`
 
-[O link para o simulador] (../Computador-de-bordo/code_simulador_motor/simulador_motor.py)
+O simulador gera os seguintes mensagens no barramento 
+
+
+```
+debian@beaglebone:~/src$ candump can1
+  can1  10088A9E   [8]  C4 09 E8 03 28 41 00 40
+  can1  10098A9E   [8]  E8 03 D0 07 78 00 FF FF
+  can1  10088A9E   [8]  C4 09 E8 03 28 41 00 40
+  can1  10098A9E   [8]  E8 03 D0 07 78 00 FF FF 
+```
+para os parametros
+ 
+```
+run.stop=0
+run.forward=1
+run.readyfor=1
+fault.bms=1
+voltage= 250 V
+current= 100 A
+temperature= 40 oC
+rpm = 1000 rpm
+mileage = 2000 km
+torque =  120 Nm
+```
+  
+
 
 ## 3.2. BMS Battery Management System
 
@@ -241,13 +272,13 @@ Com o osciloscópio mediu-se o sinal no barramento CAN e descobriu-se que a velo
 Funcionamento do Modulo concentrador de comunicação.
 Sistema composto por 4 modulos de 16 celular LIFEPO4, ligado por meio de uma barramento próprio, passando alimentação e sinais para o modulo concentrador. Este modulo concentrador tem duas portas CAN. Uma porta para  o Battery Charger e outro avulso. 
 
-Foi feito o teste no 14/05/2020 com Arduino e Can sheild da sparkfun. 
+Foi feito o teste em 14/05/2020 com Arduino e Can sheild da sparkfun. 
 Ligou somente um modulo de batterias (tensão +-40 volts) e o display do BMS. 
 Sem ligar o sparkfun o barramento mostra uma atividade muito intensa no osciloscópio. Assim que coloca o sparkfun, no barramento aparece somente vem um pacote de dados a cada 2 segundos.
 
-Usou programa 
+Com o programa 
 `CAN Read Demo for the SparkFun CAN Bus Shield.`
-Da biblioteca de CAN do Arduino Shield. Somente configurou o programa para 250khz e a porta serial 57200 bps. 
+da biblioteca de CAN do Arduino Shield consegui ler o barramento. Configurou o programa para 250khz e a porta serial 57200 bps. 
 
 
 Quando liga o concentrador somente com um modulo e o display e o Arduino CAN Shield.  

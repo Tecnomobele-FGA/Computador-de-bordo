@@ -167,6 +167,16 @@ debian@beaglebone:~$ candump any -x
 Há uma vasta documentação técnica sobre o uso do SocketCan em sistemas operacionais Linux acessando a porta CAN a partir de programas desenvolvido em C/C++ ou Python.
 
 
+
+## 2.3. Ligando wifi no Beagle
+
+Para facilitar o desenvolvimento no Pocket Beagle é necessário colocar o Beagle diretamente na internet sem usar a porta USB do computador hospedeiro. 
+
+![](fotos/Beagle_usb_dongle.jpg)
+
+
+![](figuras/Beagle_wifi_config.jpg)
+
 # 3. Programação do computador de bordo
 
 O computador de bordo tem que monitorar o controlador do motor elétrico e o BMS no barramento CAN de alta prioridade (velocidade).
@@ -177,8 +187,8 @@ No caso do BRElétrico, temos um motor de CC brushless do fabricante Guandong qu
 
 No projeto da conversão da VAN vamos usar o CVW500 da WEG que também tem uma interface CAN e implementa o protocolo CANOPEN.
 
-Ainda não temos uma definição qual protocolo de aplicação vamos usar no projeto do Computador de Bordo (OBC). 
-Há a opção de usar J1939 ou CANOPEN. O J1939 tem a vantagem de ser específico para aplicações de mobilidade. 
+Vamos implementar os dois protocolos e testar. O J1939 vai ser implementado para o BREletrico e o CANOPEN para a VAN. 
+O J1939 tem a vantagem de ser específico para aplicações de mobilidade. 
 
 
 ## 3.1. Controlador Motor PM BLDC Guandong
@@ -191,13 +201,13 @@ A taxa de envio é 40 ms mandando 2 mensagens, ou seja uma mensagem a cada 20 ms
  
 O protocolo usa CAN 2.0 com CAN expand frame 29th identifier
 
-A primeira mensagem (*frame*) frame ID code é 0x10088A9E.
+A primeira mensagem (*frame*) frame ID code é `0x10088A9E.` ou `268.995.230`.
 O dados são os seguintes:
 
 
 | Location | data name           |  explain   |
 |:--------:|:-------------------:|:---------:|
-| BYTE1    | voltage low byte    | 0.1 V/bit offset: -10000 range: 0~500v|
+| BYTE1    | voltage low byte    | 0.1 V/bit offset: -10000 range: 0~500v (o offset tá meio estranho )|
 | BYTE2    | voltage high byte   |
 | BYTE3    | currente low byte   | 0.1 A/bit offset: -10000 range -500A~500A |
 | BYTE4    | currente high byte  |
@@ -222,22 +232,24 @@ O código de erro nos BYTES 7 e 8 (*Fault code instruction*) tem os seguintes fo
 | 75℃ | BMS | over speed | over heating | over voltage | under voltage | over current | IGBT |
 
 
-A segunda mensagem (*frame ID code*) tem como código  0x10098A9E. 
+A segunda mensagem (*frame ID code*) tem como código de identificação de `0x10098A9E`  ou `269.060.766`. 
 Os dados mostram a operação do motor da seguinte maneira:
 | DATA LOCATION | DATA NAME | explain ||---------------|-----------|---------|
 | BYTE1 | motor speed low byte | 1rpm,  offset： 0, range：0 ～10000 |
 | BYTE2 | motor speed high byte | |
-| BYTE3 | mileage low byte	| 0.1	kilometer, offset：0, range：0～30000| |BYTE4	| mileage high byte |	|BYTE5	| motor torque low byte	 | 0.1NM, offset：-10000, range：-1000～1000 ||BYTE6	| motor torque high byte ||BYTE7	| reserved|	|BYTE8	| reserved|
+| BYTE3 | mileage low byte	| 0.1	kilometer, offset：0, range：0～30000| |BYTE4	| mileage high byte |	|BYTE5	| motor torque low byte	 | 0.1NM, offset：-10000, range：-1000～1000 (o valor do offset é estranho .....) ||BYTE6	| motor torque high byte ||BYTE7	| reserved|	|BYTE8	| reserved|
 	```
 0x10088A9E = PDU format 0x08, specific 0x8A, PGN = 2186, source adress = 0x9E
 0x10098A9E = PDU format 0x09, specific 0x8A, PGN = 2442, source adress = 0x9E
 ```
 
-Para facilitar o desenvolvimento do OBC fizemos uma programa de simulação da comunicação do controlador PM BLDC Guandong em python que está no diretório:
+Para facilitar o desenvolvimento do OBC fizemos uma programa de simulação da comunicação do controlador PM BLDC Guandong em python com a biblioteca Python CAN [https://python-can.readthedocs.io/en/master/](https://python-can.readthedocs.io/en/master/)
 
-`code_simulador_motor/simularo_motor.py`
+O programa está no diretório:
 
-O simulador gera os seguintes mensagens no barramento 
+`code_simulador_motor/simulador_motor.py`
+
+O simulador gera as seguintes mensagens no barramento a cada 20ms, conforme especificado no datasheet do fabricante.
 
 
 ```
@@ -261,10 +273,202 @@ rpm = 1000 rpm
 mileage = 2000 km
 torque =  120 Nm
 ```
+
+O programa de simulação do motor PM da Guandong foi feito de forma codificando diretamente os valores num frame CAN.
+Este método funciona quando é um sistema com muito poucos nós e poucas mensagens.
+Na medida que os sistemas incorporam mais ECUs no barramento vai ser necessário usar ferramentas específicas para analisar e acompanhar o trafego na rede. 
+
+O protocolo J1939 especifica as camadas as camada de rede e as camadas superiores do modelo OSI. 
+A camada de rede tem a necessidade de, em primeiro lugar, definir o sistema de endereçamento da rede e garantir a entrega dos pacotes ou mensagens para os endereçados.
+
+Assim os ECUs numa rede CAN devem ter pelo menos um endereço para poder encaminhar as mensagens. 
+O protocolo J1939 define que os ECUs devem ter pelo menos um endereço físico e um nome. 
+Entretanto, um ECUs pode controlar mais endereços e nomes. 
+A função do endereço é definir o destino ou a origem da mensagem, enquanto o nome inclua uma indicação da funcionalidade do ECU no endereço.
+
+A identificação do frame no caso do Controlador do Motor Guandong é `0x10 08 8A 9E` e `0x10 09 8A 9E`. 
+Essas identificações são formados por 29 bits ou 4 bytes (32 bits - 3 bits). 
+
+O últime byte é o endereço de origem, que neste caso é 0x9E.
+Em seguida vem dois bytes que formam o Parameter Grupo Number (PGN). 
+As duas mensagens mandados pelo motor tem como Paramater Group Number PGN 0x088A e 0x098A respectivamente.
+
+Com os bytes mais significativo do PGN (0x88 e 0x98) ficam dentra da faixa de [0x00-0xEF] o byte menos significativo do PGN indica o endereço de destino da mensagem. 
+Neste caso o endereço de destino é 0x8A. 
+Se o byte mais significiva do fosse entre a faixa de [0xF0 a 0xFF] a mensagem seria do tipo broadcast. 
+
+Precisa-se ainda confirmar essa informação, pois eu não sei se o PGN é formado com a configuração big endian ou little endian, podendo ser 0x088A ou 0x8A08.
+ 
+O PGN do J1939 especificam um dicionário de dados, para que se possa traduzir os bytes da mensagem em valores físicos do veículo por meio de DBC ou Database Can, também chamado de dicionário de dados.
+
   
+## 3.2. Python Cantools
+
+A biblioteca CANTOOLS permite codificar e decodificar mensagens CAN por meio de arquivos DBC. [https://github.com/eerimoq/cantools](https://github.com/eerimoq/cantools)
+
+A partir da documentação dos dados do fabricante do motor da Guandong construimos um dicionário de dados DBC e com isso podemos usar o codificador do CANTOOLS para montar as mensagens.
+
+A montagem do DBC foi baseado no documento da CSS-Electronics [https://www.csselectronics.com/screen/page/can-dbc-file-database-intro](https://www.csselectronics.com/screen/page/can-dbc-file-database-intro)
 
 
-## 3.2. BMS Battery Management System
+O programa que simula o funcionamento do controlador do motor em python com a biblioteca do CANTOOLS é `simulador_motor_cantools.py` e está no diretório `code_simulador_motor`
+
+```
+import can 
+import cantools
+from pprint import pprint
+
+db = cantools.database.load_file('DBC/BRELETmotor.dbc') 
+pprint(db.messages)
+message1 = db.get_message_by_name('EVEC1')
+message2 = db.get_message_by_name('EVEC2')
+
+pprint (message1.signals)
+pprint (message2.signals)
+
+can_bus=can.interface.Bus(bustype='socketcan', channel='can0', bitrate=250000)
+
+data = message1.encode({'EngineSpeed': 520, 'Mileage': 260, 'MotorTorque': 250})
+mandou = can.Message(arbitration_id=message1.frame_id, data=data)
+can_bus.send(mandou)
+
+data = message2.encode({'Voltage': 300, 'Current': 260, 'Temperature': 50, 
+  'Forward':1, 'Backward':1, 'Brake':1, 'Stop':1, 'Ready':1, 
+  'IGBT':1, 'OverCurrent':1,'UnderVoltage':1,'OverVoltage':1,'OverHeating':1,
+  'OverSpeed':1, 'BMS':1, 'Error75g':1
+  })
+mandou = can.Message(arbitration_id=message2.frame_id, data=data)
+can_bus.send(mandou)
+
+```
+
+O dicionário de dados está no arquivo `BRELETmotor.dbc` na pasta `DBC`
+
+```
+VERSION ""
+
+NS_ : 
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+    CAT_DEF_
+    CAT_
+    FILTER
+    BA_DEF_DEF_
+    EV_DATA_
+    ENVVAR_DATA_
+    SGTYPE_
+    SGTYPE_VAL_
+    BA_DEF_SGTYPE_
+    BA_SGTYPE_
+    SIG_TYPE_REF_
+    VAL_TABLE_
+    SIG_GROUP_
+    SIG_VALTYPE_
+    SIGTYPE_VALTYPE_
+    BO_TX_BU_
+    BA_DEF_REL_
+    BA_REL_
+    BA_DEF_DEF_REL_
+    BU_SG_REL_
+    BU_EV_REL_
+    BU_BO_REL_
+    SG_MUL_VAL_
+
+BS_:
+
+BU_:
+
+BO_ 2416544414 EVEC1: 8 Vector__XXX
+ SG_ EngineSpeed : 0|16@1+ (1,0) [0|10000] "rpm" Vector__XXX
+ SG_ Mileage     : 16|16@1+ (0.1,0) [0|300000] "km" Vector__XXX
+ SG_ MotorTorque : 32|16@1+ (0.1,-1000) [-1000|1000] "Nm" Vector__XXX
+
+BO_ 2416478878 EVEC2: 8 Vector__XXX
+ SG_ Voltage : 0|16@1+ (0.1,-1000) [0|500] "v" Vector__XXX
+ SG_ Current :16|16@1+ (0.1,-1000) [-500|500] "A" Vector__XXX
+ SG_ Temperature :32|8@1+ (0.1,40) [0|100] "A" Vector__XXX
+ SG_ Forward  :40|1@0+ (1,0) [0|0] "-" Vector__XXX
+ SG_ Backward :41|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ Brake    :42|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ Stop     :43|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ Ready    :46|1@0+ (1,0) [0|0] "-" Vector__XXX  
+ SG_ IGBT         :48|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ OverCurrent  :49|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ UnderVoltage :50|1@0+ (1,0) [0|0] "-" Vector__XXX  
+ SG_ OverVoltage  :51|1@0+ (1,0) [0|0] "-" Vector__XXX  
+ SG_ OverHeating  :52|1@0+ (1,0) [0|0] "-" Vector__XXX    
+ SG_ OverSpeed    :53|1@0+ (1,0) [0|0] "-" Vector__XXX   
+ SG_ BMS          :54|1@0+ (1,0) [0|0] "-" Vector__XXX 
+ SG_ Error75g     :55|1@0+ (1,0) [0|0] "-" Vector__XXX     
+
+CM_ BO_ 2416544414 "Electric Vehicle Electronic Engine Controller 1";
+CM_ SG_ 2416544414 EngineSpeed "Atual rotacao do motor electrico.";
+CM_ SG_ 2416544414 Mileage "Atual quilometragem. ";
+CM_ SG_ 2416544414 MotorTorque "Atual torque do motor. ";
+CM_ BO_ 2416478878 "Electric Vehicle Electronic Engine Controller 2";
+CM_ SG_ 2416478878 Voltage "Voltage of motor controller. ";
+CM_ SG_ 2416478878 Current "Current of motor controller. ";
+CM_ SG_ 2416478878 Temperature "Temperature of motor controller. ";
+CM_ SG_ 2416478878 Forward "Estado do motor para frente. ";
+CM_ SG_ 2416478878 Backward "Estado do motor para traz. ";
+CM_ SG_ 2416478878 Brake "Estado do motor Freio. ";
+CM_ SG_ 2416478878 Stop "Estado do motor Parada. ";
+CM_ SG_ 2416478878 Ready "Estado do motor Pronto. ";
+CM_ SG_ 2416478878 IGBT "Erro no IGBT. ";
+CM_ SG_ 2416478878 OverCurrent "Erro de Sobre Corrente Overcurrent. ";
+CM_ SG_ 2416478878 UnderVoltage "Erro de Sob tensao Undervoltage. ";
+CM_ SG_ 2416478878 OverVoltage "Erro de Sobre tensao OverVoltage. ";
+CM_ SG_ 2416478878 OverHeating "Erro de Sobre Temperatura OverHeating. ";
+CM_ SG_ 2416478878 OverSpeed "Erro de Sobre Velocidade OverSpeed. ";
+CM_ SG_ 2416478878 BMS "Erro de BMS. ";
+CM_ SG_ 2416478878 Error75g "Erro de 75 graus Celsius. ";
+
+BA_DEF_ SG_  "SPN" INT 0 524287;
+BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","J1939PG";
+BA_DEF_  "DatabaseVersion" STRING ;
+BA_DEF_  "BusType" STRING ;
+BA_DEF_  "ProtocolType" STRING ;
+BA_DEF_  "DatabaseCompiler" STRING ;
+BA_DEF_DEF_  "SPN" 0;
+BA_DEF_DEF_  "VFrameFormat" "J1939PG";
+BA_DEF_DEF_  "DatabaseVersion" "";
+BA_DEF_DEF_  "BusType" "";
+BA_DEF_DEF_  "ProtocolType" "";
+BA_DEF_DEF_  "DatabaseCompiler" "";
+BA_ "ProtocolType" "J1939";
+BA_ "BusType" "CAN";
+BA_ "DatabaseCompiler" "Projeto BREletrico UnB";
+BA_ "DatabaseVersion" "1.0.0";
+BA_ "VFrameFormat" BO_ 2416544414 3;
+BA_ "SPN" SG_ 2416544414 EngineSpeed 190;
+BA_ "SPN" SG_ 2416478878 Voltage 84;
+```
+
+Tive que fazer uma adaptação no frame ID code de `0x10088A9E` ou `268995230`. 
+Para que o CANTOOLS decodiica corretamente o código de 11 bits tivemos que mudar o frame para `0x90088A9E` ou seja, colocar um bit no primeiro bit da frame. Eu ainda não sei por que, mas deve ter a ver com o formato da frame.
+
+
+Agora dá para fazer a decodificação dos dados gerados pelo motor usando o DBC com um programa simples em Python
+
+
+```
+import can 
+import cantools
+from pprint import pprint
+
+can_bus=can.interface.Bus(bustype='socketcan', channel='can1', bitrate=250000)
+db = cantools.database.load_file('BRELETmotor.dbc')
+
+message = can_bus.recv()
+pprint(db.decode_message(message.arbitration_id, message.data))
+```
+
+ 
+ 
+## 3.4. BMS Battery Management System
 
 `src/BrEletrica/Barramento_Alta_Can.Barramento_Alta_README.md`
 

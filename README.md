@@ -448,8 +448,139 @@ BA_ "SPN" SG_ 2416478878 Voltage 84;
 ```
 
 Tive que fazer uma adaptação no frame ID code de `0x10088A9E` ou `268995230`. 
-Para que o CANTOOLS decodiica corretamente o código de 11 bits tivemos que mudar o frame para `0x90088A9E` ou seja, colocar um bit no primeiro bit da frame. Eu ainda não sei por que, mas deve ter a ver com o formato da frame.
+Para que o CANTOOLS decodifica corretamente o código de 11 bits tivemos que mudar o frame para `0x90088A9E` ou seja, colocar um bit no primeiro bit da frame. Eu ainda não sei por que, mas deve ter a ver com o formato da frame.
 
+
+Para conferir o DBC pode se usar o comando 
+`$ cantools dump BRELETmotor.dbc` que gera automaticamente a estrutura do DBC.
+
+```
+================================= Messages =================================
+
+  ------------------------------------------------------------------------
+
+  Name:       EVEC1
+  Id:         0x10098a9e
+      Priority:       4
+      PGN:            0x00900
+      Source:         0x9e
+      Destination:    0x8a
+      Format:         PDU 1
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- EngineSpeed
+           +---+---+---+---+---+---+---+---+
+         2 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+     B   3 |<------------------------------|
+     y     +---+---+---+---+---+---+---+---+
+     t       +-- Mileage
+     e     +---+---+---+---+---+---+---+---+
+         4 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         5 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- MotorTorque
+           +---+---+---+---+---+---+---+---+
+         6 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         7 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+
+  Signal tree:
+
+    -- {root}
+       +-- EngineSpeed
+       +-- Mileage
+       +-- MotorTorque
+
+  ------------------------------------------------------------------------
+
+  Name:       EVEC2
+  Id:         0x10088a9e
+      Priority:       4
+      PGN:            0x00800
+      Source:         0x9e
+      Destination:    0x8a
+      Format:         PDU 1
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- Voltage
+           +---+---+---+---+---+---+---+---+
+         2 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         3 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- Current
+           +---+---+---+---+---+---+---+---+
+         4 |<-----------------------------x|
+           +---+---+---+---+---+---+---+---+
+             +-- Temperature
+           +---+---+---+---+---+---+---+---+
+     B   5 |   |<-x|   |   |<-x|<-x|<-x|<-x|
+     y     +---+---+---+---+---+---+---+---+
+     t           |           |   |   |   +-- Forward
+     e           |           |   |   +-- Backward
+                 |           |   +-- Brake
+                 |           +-- Stop
+                 +-- Ready
+           +---+---+---+---+---+---+---+---+
+         6 |<-x|<-x|<-x|<-x|<-x|<-x|<-x|<-x|
+           +---+---+---+---+---+---+---+---+
+             |   |   |   |   |   |   |   +-- IGBT
+             |   |   |   |   |   |   +-- OverCurrent
+             |   |   |   |   |   +-- UnderVoltage
+             |   |   |   |   +-- OverVoltage
+             |   |   |   +-- OverHeating
+             |   |   +-- OverSpeed
+             |   +-- BMS
+             +-- Error75g
+           +---+---+---+---+---+---+---+---+
+         7 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+
+  Signal tree:
+
+    -- {root}
+       +-- Voltage
+       +-- Current
+       +-- Temperature
+       +-- Ready
+       +-- Stop
+       +-- Brake
+       +-- Backward
+       +-- Forward
+       +-- Error75g
+       +-- BMS
+       +-- OverSpeed
+       +-- OverHeating
+       +-- OverVoltage
+       +-- UnderVoltage
+       +-- OverCurrent
+       +-- IGBT
+```       
 
 Agora dá para fazer a decodificação dos dados gerados pelo motor usando o DBC com um programa simples em Python
 
@@ -617,13 +748,6 @@ Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação re
 
 [1] Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Automotivas – Estudo de Caso. UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL, 2016.
 
-![](figuras/tab_pgn_01.jpg)
-
-![](figuras/tab_pgn_02.jpg)
-
-![](figuras/tab_pgn_03.jpg)
-
-![](figuras/tab_pgn_04.jpg)
 
 
 
@@ -637,4 +761,10 @@ O motor da WEG VVW500 usa Canopen @ 250000bps e identificação de 11bits.
 4) Ribeiro A do N, Meneghin P, Els RH van. Developing technology for a Brazilian hybrid electric mini car. 2nd Lat. Am. Conf. Sustain. Dev. Energy, Water Environ. Syst., 2020, p. 1–10. 
 [link artigo](http://fga.unb.br/rudi.van/galeria/arrigo-alex-lasdewes20-fp-161.pdf)
 
-[Volta](../README.md)
+[Volta](../README.md)# Anexos ![](figuras/tab_pgn_01.jpg)
+
+![](figuras/tab_pgn_02.jpg)
+
+![](figuras/tab_pgn_03.jpg)
+
+![](figuras/tab_pgn_04.jpg)

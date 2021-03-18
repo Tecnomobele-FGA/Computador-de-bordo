@@ -177,7 +177,7 @@ Para facilitar o desenvolvimento no Pocket Beagle é necessário colocar o Beagl
 
 ![](figuras/Beagle_wifi_config.jpg)
 
-# 3. Programação do computador de bordo
+# 3. Comunicação no barramento CA - Camadas superiores
 
 O computador de bordo tem que monitorar o controlador do motor elétrico e o BMS no barramento CAN de alta prioridade (velocidade).
 
@@ -189,6 +189,37 @@ No projeto da conversão da VAN vamos usar o CVW500 da WEG que também tem uma i
 
 Vamos implementar os dois protocolos e testar. O J1939 vai ser implementado para o BREletrico e o CANOPEN para a VAN. 
 O J1939 tem a vantagem de ser específico para aplicações de mobilidade. 
+
+
+## 3.1. Protocolo J1939
+
+O protocolo J1939 em termos gerais define as mensagens que vão transitar no barramento, para onde eles vão, as prioridades das mensagens e frequencia com que determinadas mensagens são disponibilizados no barramento.
+
+Dessa foram, o computador de bordo só precisa monitorar o barramento e usar as mensagens que lhe interessa para tomar determinada ação e colocar mensagens com as suas demandas ou ações no barramento de volta. 
+
+Por exemplo: O protocolo J1939 implementado pelo controlador do motor elétrico manda a cada 40ms informação com a tensão e corrente do motor. O BMS manda também em tempos regulares o estado da bateria, indicando quanto de energia ainda tem disponível. O módulo de instrumentação manda a cada 100ms a informação da velocidade do veículo. Com estes dados, o OBC computador de bordo pode calcular por exemplo qual automia em Km, mantendo o mesmo padrão de direção e mostrar essa informação para o condutor.
+
+
+### Estrutura do J1939
+
+O J1939 aproveita o identificador do 29 bits do CAN para passar informações específicas do tipo de comunicação. 
+
+A estrutura de bits da identificação tem o seguinte formato.
+
+| priority | Extendes data page | data page | PDU Format | PDU Specific | source adddres |
+|:------:|:-----:|:----:|--------|--------|--------|
+| 3 bits | 1 bit | 1bit | 8 bits | 8 bits | 8 bits |
+
+
+Os campos PDU Format e PDU Specific construem o valor que será atribuído ao Parameter Group Number PGN da mensagem e também definem o modo como as mensagens são endereçadas no barramento.
+
+| PDU Format | descriçao | PDU Specific | 
+|:-----:|:----:|:------:|
+| 0-0xEF ou 0-239 | transmite para endereco indicado no PDU specific | endereco|
+| 0xF0-0xFF ou 240-255 | broadcast | Indice de referencia do Group Extension |  
+
+A formatação do PGN é (PDU format) * 0x100 + PDU specific  
+
 
 
 ## 3.1. Controlador Motor PM BLDC Guandong
@@ -301,48 +332,110 @@ Precisa-se ainda confirmar essa informação, pois eu não sei se o PGN é forma
  
 O PGN do J1939 especificam um dicionário de dados, para que se possa traduzir os bytes da mensagem em valores físicos do veículo por meio de DBC ou Database Can, também chamado de dicionário de dados.
 
-  
-## 3.2. Python Cantools
 
-A biblioteca CANTOOLS permite codificar e decodificar mensagens CAN por meio de arquivos DBC. [https://github.com/eerimoq/cantools](https://github.com/eerimoq/cantools)
+## 3.2. Modulo de instrumentação
 
-A partir da documentação dos dados do fabricante do motor da Guandong construimos um dicionário de dados DBC e com isso podemos usar o codificador do CANTOOLS para montar as mensagens.
+O módulo de instrumentação monitora a velocidade do veículo assim como controla o sistema de arrefeciento do veículo e o sistema do servo freio, assim com monitora outros subsistemas do veículo. 
 
-A montagem do DBC foi baseado no documento da CSS-Electronics [https://www.csselectronics.com/screen/page/can-dbc-file-database-intro](https://www.csselectronics.com/screen/page/can-dbc-file-database-intro)
+O modulo de instrumentação está documentado em 
+[`https://github.com/Tecnomobele-FGA/Modulo-instrumentacao`](https://github.com/Tecnomobele-FGA/Modulo-instrumentacao)
+
+O link para a implementação do programa de controle está em 
+[`https://github.com/rudivels/BREletrica_Sensor_CAN_Lcd_Velocidade_temperatura`](https://github.com/rudivels/BREletrica_Sensor_CAN_Lcd_Velocidade_temperatura)  
 
 
-O programa que simula o funcionamento do controlador do motor em python com a biblioteca do CANTOOLS é `simulador_motor_cantools.py` e está no diretório `code_simulador_motor`
+## 3.3. Módulo de Luzes
+
+O módulo de luzes controle todos comandos de sinalização do painel e comanda as luzes a sinalização. 
+
+O módulo está documentado em
+ 
+[`https://github.com/Tecnomobele-FGA/Modulo-luzes`](https://github.com/Tecnomobele-FGA/Modulo-luzes)
+
+O link pata a implementação do programa de controle está em 
+
+[`https://github.com/rudivels/BREletrica_Luzes_CAN_beep_display`](https://github.com/rudivels/BREletrica_Luzes_CAN_beep_display)
+
+## 3.4. BMS Battery Management System
+
+
+Não temos documentação sobre o protocolo J1939 do BMS (EK-YT-21-BMS). 
+A documentação se encontra no link 
+[https://github.com/Tecnomobele-FGA/Banco-baterias](https://github.com/Tecnomobele-FGA/Banco-baterias)
+
+O BMS é composto por 4 modulos de 16 celular LIFEPO4, ligado por meio de uma barramento próprio, passando alimentação e sinais para o modulo concentrador. Este modulo concentrador tem duas portas CAN. Uma porta para  o Battery Charger e outro avulso. 
+
+Com o osciloscópio mediu-se o sinal no barramento CAN e descobriu-se que a velocidade de comunicação do barramento era de 250khz. 
+
+Foi feito o teste em 14/05/2020 com Arduino e Can sheild da sparkfun. 
+Ligou somente um modulo de batterias (tensão +-40 volts) e o display do BMS. 
+Sem ligar o sparkfun o barramento mostra uma atividade muito intensa no osciloscópio. Assim que coloca o sparkfun, no barramento aparece somente um pacote de dados a cada 2 segundos.
+
+Com o programa 
+`CAN Read Demo for the SparkFun CAN Bus Shield.`
+da biblioteca de CAN do Arduino Shield consegui ler o barramento. Configurou o programa para 250khz e a porta serial 57200 bps. 
+
+Quando liga o concentrador somente com um modulo e o display e o Arduino CAN Shield.  
+
+Testando com candump dia 04 junho 2020 ligando o BMS
 
 ```
-import can 
-import cantools
-from pprint import pprint
-
-db = cantools.database.load_file('DBC/BRELETmotor.dbc') 
-pprint(db.messages)
-message1 = db.get_message_by_name('EVEC1')
-message2 = db.get_message_by_name('EVEC2')
-
-pprint (message1.signals)
-pprint (message2.signals)
-
-can_bus=can.interface.Bus(bustype='socketcan', channel='can0', bitrate=250000)
-
-data = message1.encode({'EngineSpeed': 520, 'Mileage': 260, 'MotorTorque': 250})
-mandou = can.Message(arbitration_id=message1.frame_id, data=data)
-can_bus.send(mandou)
-
-data = message2.encode({'Voltage': 300, 'Current': 260, 'Temperature': 50, 
-  'Forward':1, 'Backward':1, 'Brake':1, 'Stop':1, 'Ready':1, 
-  'IGBT':1, 'OverCurrent':1,'UnderVoltage':1,'OverVoltage':1,'OverHeating':1,
-  'OverSpeed':1, 'BMS':1, 'Error75g':1
-  })
-mandou = can.Message(arbitration_id=message2.frame_id, data=data)
-can_bus.send(mandou)
-
+breletrico@AcerNetbook:~$ candump can0 -c -tA -a
+ (2020-06-04 13:35:16.779575)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:16.782567)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:17.782563)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:17.782604)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:18.782639)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:18.782687)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:19.781635)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:19.781682)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:20.780662)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:20.784656)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:21.784668)  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
+ (2020-06-04 13:35:21.784720)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:22.783705)  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
+ (2020-06-04 13:35:22.783752)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:23.783718)  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
+ (2020-06-04 13:35:23.786722)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
+ (2020-06-04 13:35:24.786772)  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
+ (2020-06-04 13:35:24.786814)  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
 ```
 
-O dicionário de dados está no arquivo `BRELETmotor.dbc` na pasta `DBC`
+Teste com timestamp e Chaveado a bateria on/off
+
+`0x1806E5F4 = PDU Format 0x06, PDU Specific 0xE5, PGN = 1765, source adress = 0xF4`
+`0x0CF1EFF4 = PDU Format 0xF1, PDU Specific 0xEF, PGN = 61935, source address = 0xF4`
+
+Dá para concluir que o endereço de origem (Source Address) é 0xF4.
+A primeira mensagem é destinada ao endereço 0xE5 enquanto a segunda mensagem é do tipo broadcast.
+
+Vamos precisar descobrir o que essas mensagens significam.
+
+
+# 4. Database CAN - DBC ou dicionário de dados
+
+A partir da documentação dos dados de todos os equipamentos que estão ligados no barramento CAN podemos construimos um dicionário de dados DBC.
+
+A montagem do DBC foi baseado no documento da CSS-Electronics [`https://www.csselectronics.com/screen/page/can-dbc-file-database-intro`](https://www.csselectronics.com/screen/page/can-dbc-file-database-intro)
+
+Até o presente momento temos 4 ECU que vão ser interligados no barramento CAN
+
+
+
+| nome | ECU       | Id mensagem | Id  (hex) |
+|:-----|:---------:|------------:|----------:|
+| EVEC1 | Controlador motor elétrico Guandong | 2416544414 | 0x90098A9E |
+| EVEC2 | Controlador motor elétrico Guandong | 2416478878 | 0x90088A9E |
+| MODINSTRUM | Módulo de Instrumentação | 2432614288 | 0x90FEBF90 |
+| MODLUZ | Módulo de luzes e sinalização| |
+| BMS1  | BMS  (EK-YT-21-BMS) | 403105268| 0x1806E5F4 |
+| BMS1  | BMS  (EK-YT-21-BMS) | 217182196| 0x0CF1EFF4 |
+
+
+O dicionario de dados contem por enquanto só as mensagens que estão sendo transmitido pelo controlador do motor elétrico e o módulo de instrumentação.
+
+O arquivo é  `BRELETmotorV2.dbc` na pasta `DBC`
+
 
 ```
 VERSION ""
@@ -381,6 +474,9 @@ BS_:
 
 BU_:
 
+BO_ 2432614288 MODINSTRUM: 8 Vector__XXX
+ SG_ Velocity : 0|16@1+ (1,0) [0|200] "km/h" Vector__XXX
+
 BO_ 2416544414 EVEC1: 8 Vector__XXX
  SG_ EngineSpeed : 0|16@1+ (1,0) [0|10000] "rpm" Vector__XXX
  SG_ Mileage     : 16|16@1+ (0.1,0) [0|300000] "km" Vector__XXX
@@ -404,6 +500,8 @@ BO_ 2416478878 EVEC2: 8 Vector__XXX
  SG_ BMS          :54|1@0+ (1,0) [0|0] "-" Vector__XXX 
  SG_ Error75g     :55|1@0+ (1,0) [0|0] "-" Vector__XXX     
 
+CM_ BO_ 2432614288 "Modulo de instrumentacao";
+CM_ SG_ 2432614288 Velocity "Velocidade da roda dianteira ";
 CM_ BO_ 2416544414 "Electric Vehicle Electronic Engine Controller 1";
 CM_ SG_ 2416544414 EngineSpeed "Atual rotacao do motor electrico.";
 CM_ SG_ 2416544414 Mileage "Atual quilometragem. ";
@@ -452,10 +550,52 @@ Para que o CANTOOLS decodifica corretamente o código de 11 bits tivemos que mud
 
 
 Para conferir o DBC pode se usar o comando 
-`$ cantools dump BRELETmotor.dbc` que gera automaticamente a estrutura do DBC.
+`$ cantools dump BRELETmotorV2.dbc` que gera automaticamente a estrutura do DBC.
 
 ```
 ================================= Messages =================================
+
+  ------------------------------------------------------------------------
+
+  Name:       MODINSTRUM
+  Id:         0x10febf90
+      Priority:       4
+      PGN:            0x0febf
+      Source:         0x90
+      Destination:    All
+      Format:         PDU 2
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- Velocity
+           +---+---+---+---+---+---+---+---+
+     B   2 |   |   |   |   |   |   |   |   |
+     y     +---+---+---+---+---+---+---+---+
+     t   3 |   |   |   |   |   |   |   |   |
+     e     +---+---+---+---+---+---+---+---+
+         4 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         5 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         6 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         7 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+
+  Signal tree:
+
+    -- {root}
+       +-- Velocity
 
   ------------------------------------------------------------------------
 
@@ -580,9 +720,52 @@ Para conferir o DBC pode se usar o comando
        +-- UnderVoltage
        +-- OverCurrent
        +-- IGBT
-```       
 
-Agora dá para fazer a decodificação dos dados gerados pelo motor usando o DBC com um programa simples em Python
+  ------------------------------------------------------------------------
+
+```
+
+
+# 5. Python Cantools
+
+A biblioteca CANTOOLS permite codificar e decodificar mensagens CAN por meio de arquivos DBC. [https://github.com/eerimoq/cantools](https://github.com/eerimoq/cantools)
+
+A vantagem dessa aborfagem é que todo a informação das mensagens no barramento pode ser verificado com o arquivo DBC. 
+
+O programa que simula o funcionamento do controlador do motor em python com a biblioteca do CANTOOLS é `simulador_motor_cantools.py` e está no diretório `code_simulador_motor`
+
+```
+import can 
+import cantools
+from pprint import pprint
+
+db = cantools.database.load_file('DBC/BRELETmotor.dbc') 
+pprint(db.messages)
+message1 = db.get_message_by_name('EVEC1')
+message2 = db.get_message_by_name('EVEC2')
+
+pprint (message1.signals)
+pprint (message2.signals)
+
+can_bus=can.interface.Bus(bustype='socketcan', channel='can0', bitrate=250000)
+
+data = message1.encode({'EngineSpeed': 520, 'Mileage': 260, 'MotorTorque': 250})
+mandou = can.Message(arbitration_id=message1.frame_id, data=data)
+can_bus.send(mandou)
+
+data = message2.encode({'Voltage': 300, 'Current': 260, 'Temperature': 50, 
+  'Forward':1, 'Backward':1, 'Brake':1, 'Stop':1, 'Ready':1, 
+  'IGBT':1, 'OverCurrent':1,'UnderVoltage':1,'OverVoltage':1,'OverHeating':1,
+  'OverSpeed':1, 'BMS':1, 'Error75g':1
+  })
+mandou = can.Message(arbitration_id=message2.frame_id, data=data)
+can_bus.send(mandou)
+
+```
+
+
+
+Agora dá para fazer a decodificação dos dados gerados pelo motor usando o DBC com um programa simples em Python `decoder.py`
 
 
 ```
@@ -590,144 +773,55 @@ import can
 import cantools
 from pprint import pprint
 
+print("Dados do DBC")
+db = cantools.database.load_file('BRELETmotorV2.dbc')
+pprint(db.messages)
+m=db.get_message_by_name('MODINSTRUM')
+pprint(m.signals)
+
+print("Abrindo CAN1")
 can_bus=can.interface.Bus(bustype='socketcan', channel='can1', bitrate=250000)
-db = cantools.database.load_file('BRELETmotor.dbc')
 
-message = can_bus.recv()
-pprint(db.decode_message(message.arbitration_id, message.data))
+mensagem = can_bus.recv()
+pprint(mensagem)
+mm=db.decode_message(mensagem.arbitration_id, mensagem.data)
+pprint(mm)
 ```
 
+Este programa terá como saída 
+
+```
+$ python3 decoder.py 
+Dados do DBC
+[message('MODINSTRUM', 0x10febf90, True, 8, {None: 'Modulo de instrumentacao'}),
+ message('EVEC1', 0x10098a9e, True, 8, {None: 'Electric Vehicle Electronic Engine Controller 1'}),
+ message('EVEC2', 0x10088a9e, True, 8, {None: 'Electric Vehicle Electronic Engine Controller 2'})]
+[signal('Velocity', 0, 16, 'little_endian', False, None, 1, 0, 0, 200, 'km/h', False, None, None, None, {None: 'Velocidade da roda dianteira '})]
+Abrindo CAN1
+can.Message(timestamp=1616048152.323884, arbitration_id=0x10febf90, extended_id=True, channel='can1', dlc=8, data=[0xa8, 0x2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
+{'Velocity': 680}
+debian@beaglebone:~/src/canbus$ 
+```
+
+As rotinas em Python serão muito útil para analizar e fazer o processamento posterior do trafego no CAN.  
  
- 
-## 3.4. BMS Battery Management System
-
-`src/BrEletrica/Barramento_Alta_Can.Barramento_Alta_README.md`
-
-Com o osciloscópio mediu-se o sinal no barramento CAN e descobriu-se que a velocidade de comunicação do barramento era de 250khz. 
-Funcionamento do Modulo concentrador de comunicação.
-Sistema composto por 4 modulos de 16 celular LIFEPO4, ligado por meio de uma barramento próprio, passando alimentação e sinais para o modulo concentrador. Este modulo concentrador tem duas portas CAN. Uma porta para  o Battery Charger e outro avulso. 
-
-Foi feito o teste em 14/05/2020 com Arduino e Can sheild da sparkfun. 
-Ligou somente um modulo de batterias (tensão +-40 volts) e o display do BMS. 
-Sem ligar o sparkfun o barramento mostra uma atividade muito intensa no osciloscópio. Assim que coloca o sparkfun, no barramento aparece somente vem um pacote de dados a cada 2 segundos.
-
-Com o programa 
-`CAN Read Demo for the SparkFun CAN Bus Shield.`
-da biblioteca de CAN do Arduino Shield consegui ler o barramento. Configurou o programa para 250khz e a porta serial 57200 bps. 
 
 
-Quando liga o concentrador somente com um modulo e o display e o Arduino CAN Shield.  
+Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação rede CAN com BBB e Python <https://www.embarcados.com.br/can-com-beaglebone-black-e-python/>
 
-Primeiro teste arduino 
-
-```
-CAN Read - Testing receival of CAN Bus message
-CAN Init ok
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-
-```
-
-Quarta teste
-
-```
-CAN Read - Testing receival of CAN Bus message
-CAN Init ok
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 00 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-ID: 33C, Data: 80 00 00 00 00 00 00 00 
-ID: 601, Data: 89 99 00 0F 01 00 00 00 
-```
-
-Testando com candump dia 04 junho 2020 ligando o BMS
-
-```
-breletrico@AcerNetbook:~$ candump can0 -a -c
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 00 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-  can0  1806E5F4   [8]  09 99 00 0F 01 00 00 00   '........'
-  can0  0CF1EFF4   [8]  00 00 00 00 00 00 00 00   '........'
-```
-
-Teste com timestamp e Chaveado a bateria on/off
-
-`0x1806E5F4 = PDU format 0x06, specific 0xE5, PGN = 1765, source adress = 0xF4`
-`0x0CF1EFF4 = PDU format 0xF1 specific 0xEF  PGN = 61935, source address = 0xF4`
+Para o J1939 e PGN veja Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Automotivas – Estudo de Caso. UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL, 2016.
 
 
 
-## 3.3. Protocolo J1939
+## Algoritmo do On Board Computer
 
-O J1939 aproveita o identificador do 29 bits do CAN para passar informações específicas do tipo de comunicação. 
-
-A estrutura de bits da identificação tem o seguinte formato.
-
-| priority | Extendes data page | data page | pdu format | pdu specific | source adddres |
-|:------:|:-----:|:----:|--------|--------|--------|
-| 3 bits | 1 bit | 1bit | 8 bits | 8 bits | 8 bits |
-
-
-Os campos PDU format e PDU specific constrinuem o valor que será atribuído ao PGN da mensagem e também definiem o modo como as mensagens são enereçadas na linha
-
-| PDU format | descriçao | PDU specific | 
-|:-----:|:----:|:------:|
-| 0 - 0xEF ou 0-239 | transmite para endereco indicado no PDU specific | endereco|
-| 0xF0 - 0xFF ou 240-255 | broadcast | Indice de referencia do Group Extension |  
-
-A formatação do PGN é (PDU format) * 0x100 + PDU specific  
-
-
-
-Por exemplo.
-
-Vamos colocar usar as mensagens do J1939 para mandar os dados do BMS e do Controlador do Motor para o computador de bordo
+Vamos colocar usar as mensagens do J1939 para mandar os dados do Controlador do Motor para o computador de bordo
 
 | Mensagem         | Origem | Destino | PGN   | descrição  |
 |:----------------:|:------:|:-------:|:-----:|:----------:|
 | Tensao bateria   | BMS    | todos   |  xx   |            |
 | Corrente bateria | BMS    | todos   |
 | Rotaçao motor    | Controlador motor | 
-
 
 
 Máquina de estado do computador de bordo. 
@@ -744,22 +838,18 @@ Monitorando barramento de baixa velocidade
 Visualizando dados no display.
 
 
-Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação rede CAN com BBB e Python <https://www.embarcados.com.br/can-com-beaglebone-black-e-python/>
 
-[1] Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Automotivas – Estudo de Caso. UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL, 2016.
-
-
-
-
-# 4. Protocolo CANOPEN
+# 6. Protocolo CANOPEN
 
 O motor da WEG VVW500 usa Canopen @ 250000bps e identificação de 11bits.
 
 # Bibliografia
- 
 
-4) Ribeiro A do N, Meneghin P, Els RH van. Developing technology for a Brazilian hybrid electric mini car. 2nd Lat. Am. Conf. Sustain. Dev. Energy, Water Environ. Syst., 2020, p. 1–10. 
+
+Ribeiro A do N, Meneghin P, Els RH van. Developing technology for a Brazilian hybrid electric mini car. 2nd Lat. Am. Conf. Sustain. Dev. Energy, Water Environ. Syst., 2020, p. 1–10. 
 [link artigo](http://fga.unb.br/rudi.van/galeria/arrigo-alex-lasdewes20-fp-161.pdf)
+
+Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Automotivas – Estudo de Caso. UNIVERSIDADE FEDERAL DO RIO GRANDE DO SUL, 2016.
 
 [Volta](../README.md)# Anexos ![](figuras/tab_pgn_01.jpg)
 

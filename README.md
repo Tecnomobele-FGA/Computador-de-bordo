@@ -6,10 +6,11 @@ Escolheu-se para o computador de bordo do BRElétrico o minicomputador *Beagle B
 
 Há diversas versões do Beagle Bone. Um dos mais populares é o *Beagle Bone Black (BBB)* que foi a primeira versão usado neste desenvolvimento.
 
-BBB tem uma interface HDMI, porta ethernet, porta USB e já vem com Linux embarcada e toda estrutura de software para habilita-lo como servidor com toda funcionalidade TCP-IP internet inerente do Linux. A figura a seguir mostra o diagrama do bloco do computador de bordo com display HDMI no painel do veículo e as redes  CAN ligado aos módulos.  
-
+BBB tem uma interface HDMI, porta ethernet, porta USB e já vem com Linux embarcada e toda estrutura de software para habilita-lo como servidor com toda funcionalidade TCP-IP internet inerente do Linux. A figura a seguir mostra o diagrama do bloco do computador de bordo com display HDMI no painel do veículo e as redes  CAN ligado aos módulos.
+ 
 
 ![](figuras/Diagrama_BBB_can.jpg)
+
 
 Entretanto, há uma versão mais nova que foi lançada recentemente que é mais compacto (e barato). O PocketBeagle, tem toda a funcionalidade do BBB, mas diversos conectores físicos dos interfaces da BBB foram retiradas e também foi retidada a interface HDMI. 
 
@@ -24,6 +25,8 @@ A segunda rede (Can1) permitirá a comunicação entre o modulo de medição de 
 A implementação deste sistema foi feito com um PocketBeagle e um modulo conversor CAN baseado no transciever SN65HVD230, conforme mostrado na foto a seguir:
 
 ![](fotos/pocketbeagle_can.jpg)
+
+O Pocket Beagle foi montado numa placa com transciever CAN, conversor CC/CC 12/5 volts, Wifi USB Dongle, e acesso para o serial UART.  
 
 
 
@@ -172,7 +175,7 @@ Há uma vasta documentação técnica sobre o uso do SocketCan em sistemas opera
 
 Para facilitar o desenvolvimento no Pocket Beagle é necessário colocar o Beagle diretamente na internet sem usar a porta USB do computador hospedeiro. 
 
-![](fotos/Beagle_usb_dongle.jpg)
+Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figura a seguir.
 
 
 ![](figuras/Beagle_wifi_config.jpg)
@@ -232,8 +235,10 @@ A taxa de envio é 40 ms mandando 2 mensagens, ou seja uma mensagem a cada 20 ms
  
 O protocolo usa CAN 2.0 com CAN expand frame 29th identifier
 
-A primeira mensagem (*frame*) frame ID code é `0x10088A9E.` ou `268.995.230`.
-O dados são os seguintes:
+A primeira mensagem (*frame*) frame ID code é `0x10 08 8A 9E.` ou `268.995.230`.
+Isso é uma mensagem que vai de `8A` para `9E`, pois o campo PDU format `08` é menor que `EF`. Ou seja, o endereço do controlador é `9E`. 
+
+O dados encaminhados na mensagem são os seguintes:
 
 
 | Location | data name           |  explain   |
@@ -263,7 +268,7 @@ O código de erro nos BYTES 7 e 8 (*Fault code instruction*) tem os seguintes fo
 | 75℃ | BMS | over speed | over heating | over voltage | under voltage | over current | IGBT |
 
 
-A segunda mensagem (*frame ID code*) tem como código de identificação de `0x10098A9E`  ou `269.060.766`. 
+A segunda mensagem (*frame ID code*) tem como código de identificação de `0x10 09 8A 9E`  ou `269.060.766`. 
 Os dados mostram a operação do motor da seguinte maneira:
 | DATA LOCATION | DATA NAME | explain ||---------------|-----------|---------|
 | BYTE1 | motor speed low byte | 1rpm,  offset： 0, range：0 ～10000 |
@@ -359,7 +364,8 @@ O link pata a implementação do programa de controle está em
 ## 3.4. BMS Battery Management System
 
 
-Não temos documentação sobre o protocolo J1939 do BMS (EK-YT-21-BMS). 
+O BMS é modelo EK-YT-21-BMS. 
+
 A documentação se encontra no link 
 [https://github.com/Tecnomobele-FGA/Banco-baterias](https://github.com/Tecnomobele-FGA/Banco-baterias)
 
@@ -409,7 +415,7 @@ Teste com timestamp e Chaveado a bateria on/off
 Dá para concluir que o endereço de origem (Source Address) é 0xF4.
 A primeira mensagem é destinada ao endereço 0xE5 enquanto a segunda mensagem é do tipo broadcast.
 
-Vamos precisar descobrir o que essas mensagens significam.
+A descrição do protocolo J1939 do BMS está no [https://github.com/Tecnomobele-FGA/Banco-baterias](https://github.com/Tecnomobele-FGA/Banco-baterias)
 
 
 # 4. Database CAN - DBC ou dicionário de dados

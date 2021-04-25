@@ -424,8 +424,10 @@ A partir da documentação dos dados de todos os equipamentos que estão ligados
 
 A montagem do DBC foi baseado no documento da CSS-Electronics [`https://www.csselectronics.com/screen/page/can-dbc-file-database-intro`](https://www.csselectronics.com/screen/page/can-dbc-file-database-intro)
 
-Até o presente momento temos 4 ECU que vão ser interligados no barramento CAN
+Até o presente momento temos 5 ECU que vão ser interligados no barramento CAN.
+Foi feito um ajuste para setar o primeiro bit do ID em 1.
 
+Tabela com os ECU e seus ID.
 
 
 | nome | ECU       | Id mensagem | Id  (hex) |
@@ -433,14 +435,14 @@ Até o presente momento temos 4 ECU que vão ser interligados no barramento CAN
 | EVEC1 | Controlador motor elétrico Guandong | 2416544414 | 0x90098A9E |
 | EVEC2 | Controlador motor elétrico Guandong | 2416478878 | 0x90088A9E |
 | MODINSTRUM | Módulo de Instrumentação | 2432614288 | 0x90FEBF90 |
+| BMS   | BMS  (EK-YT-21-BMS)  | 2550588916| 0x9806E5F4 |
+| CCS   | Zepia TCCH-H233-10-C | 2566869221| 0x98FF50E5 |
 | MODLUZ | Módulo de luzes e sinalização| |
-| BMS1  | BMS  (EK-YT-21-BMS) | 403105268| 0x1806E5F4 |
-| BMS1  | BMS  (EK-YT-21-BMS) | 217182196| 0x0CF1EFF4 |
 
 
-O dicionario de dados contem por enquanto só as mensagens que estão sendo transmitido pelo controlador do motor elétrico e o módulo de instrumentação.
 
-O arquivo é  `BRELETmotorV2.dbc` na pasta `DBC`
+
+O arquivo é  `BRELETmotorV3.dbc` na pasta `DBC`
 
 
 ```
@@ -506,6 +508,21 @@ BO_ 2416478878 EVEC2: 8 Vector__XXX
  SG_ BMS          :54|1@0+ (1,0) [0|0] "-" Vector__XXX 
  SG_ Error75g     :55|1@0+ (1,0) [0|0] "-" Vector__XXX     
 
+
+BO_ 2550588916 BMS: 8 Vector__XXX
+ SG_ MaxChargingVoltage :  0|16@1+ (0.1,0) [0|1000] "V" Vector__XXX
+ SG_ MaxChargingCurrent : 16|16@1+ (0.1,0) [0|1000] "A" Vector__XXX
+ SG_ ControlCharging  : 32|1@0 + (1,0) [0|0] "-" Vector__XXX
+ 
+BO_ 2566869221 CCS: 8 Vector__XXX
+ SG_ OutputVoltage :    0|16@1+ (0.1,0) [0|10000] "V" Vector__XXX
+ SG_ OutputCurrent :   16|16@1+ (0.1,0) [0|10000] "A" Vector__XXX
+ SG_ HardwareFailure      : 32|1@0 + (1,0)   [0|0] "-" Vector__XXX
+ SG_ TemperatureOfCharger : 33|1@0 + (1,0)   [0|0] "-" Vector__XXX
+ SG_ InputVoltage         : 34|1@0 + (1,0)   [0|0] "-" Vector__XXX
+ SG_ StartingState        : 35|1@0 + (1,0)   [0|0] "-" Vector__XXX
+ SG_ ComunicationState    : 36|1@0 + (1,0)   [0|0] "-" Vector__XXX
+
 CM_ BO_ 2432614288 "Modulo de instrumentacao";
 CM_ SG_ 2432614288 Velocity "Velocidade da roda dianteira ";
 CM_ BO_ 2416544414 "Electric Vehicle Electronic Engine Controller 1";
@@ -529,6 +546,18 @@ CM_ SG_ 2416478878 OverHeating "Erro de Sobre Temperatura OverHeating. ";
 CM_ SG_ 2416478878 OverSpeed "Erro de Sobre Velocidade OverSpeed. ";
 CM_ SG_ 2416478878 BMS "Erro de BMS. ";
 CM_ SG_ 2416478878 Error75g "Erro de 75 graus Celsius. ";
+CM_ BO_ 2550588916 "Battery Management System";
+CM_ SG_ 2550588916 MaxChargingVoltage "Tensao maxima admisivel "; 
+CM_ SG_ 2550588916 MaxChargingCurrent "Corrente maxima admisivel "; 
+CM_ SG_ 2550588916 ControlCharging "controle charging 0=start 1=stop ";  
+CM_ BO_ 2566869221 "Charger Controle System";
+CM_ SG_ 2566869221 OutputVoltage "Tensao de saida. "; 
+CM_ SG_ 2566869221 OutputCurrent "Corrente de saida. "; 
+CM_ SG_ 2566869221 HardwareFailure  "0=normal 1=failure "; 
+CM_ SG_ 2566869221 TemperatureOfCharger  "0=normal 1=Over temperature protection"; 
+CM_ SG_ 2566869221 InputVoltage  "0=normal "; 
+CM_ SG_ 2566869221 StartingState  "0=charger detects battery voltage and starts, 1=charges stays turned of (to prevent reverse polarity) "; 
+CM_ SG_ 2566869221 ComunicationState  "0=communication is normal, 1=communication recieve time-out "; 
 
 BA_DEF_ SG_  "SPN" INT 0 524287;
 BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","J1939PG";
@@ -556,12 +585,13 @@ Para que o CANTOOLS decodifica corretamente o código de 11 bits tivemos que mud
 
 
 Para conferir o DBC pode se usar o comando 
-`$ cantools dump BRELETmotorV2.dbc` que gera automaticamente a estrutura do DBC.
+`$ cantools dump BRELETmotorV3.dbc` que gera automaticamente a estrutura do DBC.
 
-```
-================================= Messages =================================
+## 4.1. Dicionário de dados do Modulo de instrumentação
 
-  ------------------------------------------------------------------------
+Falta a informação do cycle time no DBC. 
+
+```   ------------------------------------------------------------------------
 
   Name:       MODINSTRUM
   Id:         0x10febf90
@@ -604,6 +634,11 @@ Para conferir o DBC pode se usar o comando
        +-- Velocity
 
   ------------------------------------------------------------------------
+```
+
+## 4.2. Dicionário de dados do Controlador do Motor
+ 
+``` ------------------------------------------------------------------------
 
   Name:       EVEC1
   Id:         0x10098a9e
@@ -730,6 +765,131 @@ Para conferir o DBC pode se usar o comando
   ------------------------------------------------------------------------
 
 ```
+
+
+
+## 4.3. Dicionário de dados do BMS
+
+```
+  ------------------------------------------------------------------------
+
+  Name:       BMS
+  Id:         0x1806e5f4
+      Priority:       6
+      PGN:            0x00600
+      Source:         0xf4
+      Destination:    0xe5
+      Format:         PDU 1
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- MaxChargingVoltage
+           +---+---+---+---+---+---+---+---+
+         2 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+     B   3 |<------------------------------|
+     y     +---+---+---+---+---+---+---+---+
+     t       +-- MaxChargingCurrent
+     e     +---+---+---+---+---+---+---+---+
+         4 |   |   |   |   |   |   |   |<-x|
+           +---+---+---+---+---+---+---+---+
+                                         +-- ControlCharging
+           +---+---+---+---+---+---+---+---+
+         5 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         6 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         7 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+
+  Signal tree:
+
+    -- {root}
+       +-- MaxChargingVoltage
+       +-- MaxChargingCurrent
+       +-- ControlCharging
+
+  ------------------------------------------------------------------------
+```
+## 4.4. Dicionário de dados Controlador de carga CCS
+
+```
+------------------------------------------------------------------------
+  
+  
+
+  Name:       CCS
+  Id:         0x18ff50e5
+      Priority:       6
+      PGN:            0x0ff50
+      Source:         0xe5
+      Destination:    All
+      Format:         PDU 2
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- OutputVoltage
+           +---+---+---+---+---+---+---+---+
+         2 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         3 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+     B       +-- OutputCurrent
+     y     +---+---+---+---+---+---+---+---+
+     t   4 |   |   |   |<-x|<-x|<-x|<-x|<-x|
+     e     +---+---+---+---+---+---+---+---+
+                         |   |   |   |   +-- HardwareFailure
+                         |   |   |   +-- TemperatureOfCharger
+                         |   |   +-- InputVoltage
+                         |   +-- StartingState
+                         +-- ComunicationState
+           +---+---+---+---+---+---+---+---+
+         5 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         6 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+         7 |   |   |   |   |   |   |   |   |
+           +---+---+---+---+---+---+---+---+
+
+  Signal tree:
+
+    -- {root}
+       +-- OutputVoltage
+       +-- OutputCurrent
+       +-- ComunicationState
+       +-- StartingState
+       +-- InputVoltage
+       +-- TemperatureOfCharger
+       +-- HardwareFailure
+
+  ------------------------------------------------------------------------
+
+```
+
+
+## 4.5. Dicionário de dados modulo de sinalização 
+
+A definir...
 
 
 # 5. Python Cantools

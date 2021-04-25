@@ -1,17 +1,20 @@
 import can 
 import cantools
 from pprint import pprint
-db = cantools.database.load_file('./DBC/BRELETmotorV3.dbc') # J1939DEMO.dbc')
+db = cantools.database.load_file('../DBC/BRELETmotorV3.dbc') # J1939DEMO.dbc')
 pprint(db.messages)
 message1 = db.get_message_by_name('EVEC1')
 message2 = db.get_message_by_name('EVEC2')
 message3 = db.get_message_by_name('BMS')
 
-pprint (message1.signals)
-pprint (message2.signals)
-pprint (message3.signals)
+#pprint (message1.signals)
+#pprint (message2.signals)
+#pprint (message3.signals)
 
 can_bus=can.interface.Bus(bustype='socketcan', channel='can0', bitrate=250000)
+
+message = can_bus.recv()
+db.decode_message(message.arbitration_id, message.data)
 
 #data = message1.encode({'EngineSpeed': 520, 'Mileage': 260, 'MotorTorque': 250})
 #mandou = can.Message(arbitration_id=message1.frame_id, data=data)

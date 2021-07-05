@@ -41,21 +41,13 @@ A tabela a seguir mostra a proposta de uso dos periféricos do Pocket Beagle.
 | UART 4  | Serial LoRa Radio | P2 5,7 | Ainda não
 
 
-
-
-## 2.1 Configurando o PocketBealge
+## 2.1 Acessando o PocketBealge
 
 O primeiro passo é configurar o hardware do PocketBeagle para a proposta.
-O PocketBeagle pode ser accessado na USB pelo comando:
- 
-`ssh debian@192.168.6.2`  ou `ssh debian@beaglebone.local` 
-
-e a senha padrão do Beagle é `temppwd` 
 
 Os pinos no barramento de acesso do PocketBeagle podem ser configurados para dar acesso a várias funcionalidades do computador. 
 
 A dificuldade consiste no fato de o Beagle ter um sistemática de mapeamento de hardware no sistema operacional Linux específica, diferente dos computadores convencionais. O Beagle é um computador numa única placa que usa o processador com arquitetura ARM. Por conta dos inúmeros sistemas baseados no arquitetura ARM que surgiram para sistemas embarcadas, houve uma modificação no Kernel do Linux para dar conta a especificidades destes sistemas.
-
 
 ### 2.1.1 Acessando o Beagle pelo Serial UART
 
@@ -77,7 +69,16 @@ A foto a seguir mostra o conversor SERIAL USB-TTL que foi usado para ligar o Bea
  
 ![](fotos/Serial_interface.jpg)
 
-### 2.2.2 Configurando CAN
+### 2.1.2 Acessando o Beagle pelo USB ou pela rede
+
+O PocketBeagle pode ser accessado na USB pelo comando:
+ 
+`ssh debian@192.168.6.2`  ou `ssh debian@beaglebone.local` 
+
+e a senha padrão do Beagle é `temppwd` 
+
+
+## 2.2 Configurando a interface CAN
 
 No sistema operacional Linux  convencional as especificidades do hardware são de certa forma incorporadas no Kernel, mas este sistemática se mostrou impraticável com as placas ARM. Por isso foi introduzido a estrutura de Device Tree para que o computador Beagle saiba qual hardware e periféricos estão fisicamente instalados na placa. Veja o artigo de Mateus Gagliardi: Introdução ao uso de Device Tree e Device Tree Overlay em Sistemas Linux Embarcado. 2015. <https://www.embarcados.com.br/device-tree-linux-embarcado/>
 
@@ -171,7 +172,7 @@ Para testar se os canais CAN estão funcionando, pode fazer o teste com o loopba
 `sudo /sbin/ip link set can0 up type can bitrate 250000 loopback on`
 
 
-### 2.2.3 Ligando CAN no DB9
+### 2.2.1 Ligando CAN no DB9
 
 Vamos padronizar o conector CAN do Beagle com um DB9 macho com os seguintes pinos.
 
@@ -205,7 +206,7 @@ Há um outro padrão de pinagem CAN para DB9, mas eu ainda não descobri de onde
 Por enquanto vamos manter a padronização, para manter a compatibilidade com cabo DB9-OBDII. 
 
 
-## 2.2. Testando com can-utils
+### 2.2.2 Testando com can-utils
 
 O sistema operacional Linux embarcada no BBB já vem com pacote SocketCan ou can-utils de ferramentas para trabalhar com a rede de comunicação CAN.
  
@@ -363,7 +364,7 @@ A formatação do PGN é (PDU format) * 0x100 + PDU specific
 
 
 
-## 3.1. Controlador Motor PM BLDC Guandong
+## 3.2. Controlador Motor PM BLDC Guandong
 
 Os parametros do Controlador do motor Brushless CC PM BLDC Guandong são mandados por um CAN frame com as seguintes especificações. O fabricante menciona que os protocolos usados são CAN20.0 e J1939
 
@@ -476,7 +477,7 @@ Precisa-se ainda confirmar essa informação, pois eu não sei se o PGN é forma
 O PGN do J1939 especificam um dicionário de dados, para que se possa traduzir os bytes da mensagem em valores físicos do veículo por meio de DBC ou Database Can, também chamado de dicionário de dados.
 
 
-## 3.2. Modulo de instrumentação
+## 3.3. Modulo de instrumentação
 
 O módulo de instrumentação monitora a velocidade do veículo assim como controla o sistema de arrefeciento do veículo e o sistema do servo freio, assim com monitora outros subsistemas do veículo. 
 
@@ -487,7 +488,7 @@ O link para a implementação do programa de controle está em
 [`https://github.com/rudivels/BREletrica_Sensor_CAN_Lcd_Velocidade_temperatura`](https://github.com/rudivels/BREletrica_Sensor_CAN_Lcd_Velocidade_temperatura)  
 
 
-## 3.3. Módulo de Luzes
+## 3.4. Módulo de Luzes
 
 O módulo de luzes controle todos comandos de sinalização do painel e comanda as luzes a sinalização. 
 
@@ -499,7 +500,7 @@ O link pata a implementação do programa de controle está em
 
 [`https://github.com/rudivels/BREletrica_Luzes_CAN_beep_display`](https://github.com/rudivels/BREletrica_Luzes_CAN_beep_display)
 
-## 3.4. BMS Battery Management System
+## 3.5. BMS Battery Management System
 
 
 O BMS é modelo EK-YT-21-BMS. 

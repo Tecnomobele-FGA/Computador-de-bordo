@@ -6,8 +6,9 @@ Escolheu-se para o computador de bordo do BRElétrico o minicomputador *Beagle B
 
 Há diversas versões do Beagle Bone. Um dos mais populares é o *Beagle Bone Black (BBB)* que foi a primeira versão usado neste desenvolvimento.
 
-BBB tem uma interface HDMI, porta ethernet, porta USB e já vem com Linux embarcada e toda estrutura de software para habilita-lo como servidor com toda funcionalidade TCP-IP internet inerente do Linux. A figura a seguir mostra o diagrama do bloco do computador de bordo com display HDMI no painel do veículo e as redes  CAN ligado aos módulos.
- 
+BBB tem uma interface HDMI, porta ethernet, porta USB e já vem com Linux embarcada e toda estrutura de software para habilita-lo como servidor com toda funcionalidade TCP-IP internet inerente do Linux. 
+
+A figura a seguir mostra o diagrama do bloco do computador de bordo com display HDMI no painel do veículo e as redes  CAN ligado aos módulos. 
 
 ![](figuras/Diagrama_BBB_can.jpg)
 
@@ -28,6 +29,18 @@ A implementação deste sistema foi feito com um PocketBeagle e um modulo conver
 
 O Pocket Beagle foi montado numa placa com transciever CAN, conversor CC/CC 12/5 volts, Wifi USB Dongle, e acesso para o serial UART.  
 
+A tabela a seguir mostra a proposta de uso dos periféricos do Pocket Beagle. 
+
+| Beagle  | uso             | pinos | Situação |
+|:-------:|:---------------:|:-----:|:--------:|
+| CAN 0   | Barramento CAN  | P1 - 26, 28 | Implementado |
+| CAN 1   | ainda nao ligado fisicamente  | P2 - 9,8    | Ainda não |
+| USB     | WiFi Dongle     | P1 - 5,7,9,11,13,15 | Implementado |
+| UART0   | Acesso ao Beagle pelo serial com terminal | P1 - 30, 32 | Implementado |
+| UART 2  | Serial GPS      | P1 - 8,10 | Ainda nãp |
+| UART 4  | Serial LoRa Radio | P2 5,7 | Ainda não
+
+
 
 
 ## 2.1 Configurando o PocketBealge
@@ -42,6 +55,29 @@ e a senha padrão do Beagle é `temppwd`
 Os pinos no barramento de acesso do PocketBeagle podem ser configurados para dar acesso a várias funcionalidades do computador. 
 
 A dificuldade consiste no fato de o Beagle ter um sistemática de mapeamento de hardware no sistema operacional Linux específica, diferente dos computadores convencionais. O Beagle é um computador numa única placa que usa o processador com arquitetura ARM. Por conta dos inúmeros sistemas baseados no arquitetura ARM que surgiram para sistemas embarcadas, houve uma modificação no Kernel do Linux para dar conta a especificidades destes sistemas.
+
+
+### 2.1.1 Acessando o Beagle pelo Serial UART
+
+Uma maneira simples de acessar o Beagle sem ter que usar monitor teclado ou rede é pela porta UART0 do Beagle.
+Essa porta já vem habilitado para você entrar por meio de um programa emulador de terminal. 
+Os pinos do Pocket Beagle que permitem este acesso são dados na tabela a seguir. 
+
+| Beagle  | con | pino | UART | pino |
+|:-------:|:---:|:----:|:----:|:----:|
+| gnd     | P1  | 16   | GND  |   |
+| tx uart0| P1  | 30   | rx   |   |
+| rx uart0| P2  | 32   | tx   |   |
+
+O nível de tensão do UART é de 3.3 volts, e pode se acessar com um conversor USB- Serial TTL. 
+
+O programa de emulador de terminal tem que estar configurado com a porta serial em 115kbps, 8N1.
+
+A foto a seguir mostra o conversor SERIAL USB-TTL que foi usado para ligar o Beagle a porta USB de computador para ter acesso via terminal ao Beagle.
+ 
+![](fotos/Serial_interface.jpg)
+
+### 2.2.2 Configurando CAN
 
 No sistema operacional Linux  convencional as especificidades do hardware são de certa forma incorporadas no Kernel, mas este sistemática se mostrou impraticável com as placas ARM. Por isso foi introduzido a estrutura de Device Tree para que o computador Beagle saiba qual hardware e periféricos estão fisicamente instalados na placa. Veja o artigo de Mateus Gagliardi: Introdução ao uso de Device Tree e Device Tree Overlay em Sistemas Linux Embarcado. 2015. <https://www.embarcados.com.br/device-tree-linux-embarcado/>
 
@@ -135,6 +171,40 @@ Para testar se os canais CAN estão funcionando, pode fazer o teste com o loopba
 `sudo /sbin/ip link set can0 up type can bitrate 250000 loopback on`
 
 
+### 2.2.3 Ligando CAN no DB9
+
+Vamos padronizar o conector CAN do Beagle com um DB9 macho com os seguintes pinos.
+
+
+| Transciever | DB9 | 
+|:-----------:|:---:|
+| CANL        | 5   |
+| CANH        | 3   | 
+
+Essa configuração de pinagem é compativel com a placa Arduino CAn Shield da Sparkfun e o cabo DB9-OBDII que a acompanha.
+
+O Cabo tem a seguinte pinagem  OBDII para DB9 Femea.
+
+| Pin Description   | OBDII | DB9 |
+|:------------------|:-----:|:---:|
+| J1850 BUS+        |  2 | 7 |
+| Chassis Ground    |  4 | 2 |
+| Signal Ground     |  5 | 1 |
+| CAN High J-2284   |  6 | 3 |
+| ISO 9141-2 K Line	|  7 | 4 |
+| J1850 BUS-        | 10 | 6 |
+| CAN Low J-2284    | 14 | 5 |
+| ISO 9141-2 L Line	| 15 | 8 |
+| Battery Power     | 16 | 9 |
+
+[https://www.sparkfun.com/products/10087](https://www.sparkfun.com/products/10087)
+
+Tem que ter cuidado de não ligar o DB9 para uma porta serial RS232 convencional, pois os pinos de GND e TX e RX com tensão +de 12 e -12v vão diratemente no transciever. 
+
+Há um outro padrão de pinagem CAN para DB9, mas eu ainda não descobri de onde que vem esta definição. 
+Por enquanto vamos manter a padronização, para manter a compatibilidade com cabo DB9-OBDII. 
+
+
 ## 2.2. Testando com can-utils
 
 O sistema operacional Linux embarcada no BBB já vem com pacote SocketCan ou can-utils de ferramentas para trabalhar com a rede de comunicação CAN.
@@ -177,6 +247,15 @@ Para facilitar o desenvolvimento no Pocket Beagle é necessário colocar o Beagl
 
 Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figura a seguir.
 
+
+| Beagle  | con | pino | USB | pino |
+|:-------:|:---:|:----:|:---:|:----:|
+| Vbus    | P1  | 5    | Vcc | 1    |
+| Vin     | P1  | 7    | Vcc | 1    | 
+| DN      | P1  | 9    |     | 2    |
+| DP      | P1  | 11   |     | 3    |
+| ID      | P1  | 13   | GND | 4    |
+| GND     | P1  | 15   | GND | 4    |
 
 ![](figuras/Beagle_wifi_config.jpg)
 
@@ -898,7 +977,7 @@ A biblioteca CANTOOLS permite codificar e decodificar mensagens CAN por meio de 
 
 A vantagem dessa aborfagem é que todo a informação das mensagens no barramento pode ser verificado com o arquivo DBC. 
 
-O programa que simula o funcionamento do controlador do motor em python com a biblioteca do CANTOOLS é `simulador_motor_cantools.py` e está no diretório `code_simulador_motor`
+Pode se de um lado usar o programa que simula o funcionamento do controlador do motor em python com a biblioteca do CANTOOLS, que está no `simulador_motor_cantools.py` no diretório `code_simulador_motor`
 
 ```
 import can 
@@ -929,9 +1008,7 @@ can_bus.send(mandou)
 
 ```
 
-
-
-Agora dá para fazer a decodificação dos dados gerados pelo motor usando o DBC com um programa simples em Python `decoder.py`
+Do outro lado pode-se usar a mesma estrutura para decodificar os dados gerados pelo motor usando o DBC com um programa simples em Python `decoder.py`
 
 
 ```
@@ -969,8 +1046,15 @@ can.Message(timestamp=1616048152.323884, arbitration_id=0x10febf90, extended_id=
 debian@beaglebone:~/src/canbus$ 
 ```
 
-As rotinas em Python serão muito útil para analizar e fazer o processamento posterior do trafego no CAN.  
- 
+As rotinas do `CANTOOLS` Python serão muito útil para analizar e fazer o processamento posterior do trafego no CAN.  
+
+Tem diversas maneiras de visualizar os dados. 
+Há a opção de plotar ou monitorar.
+
+## 5.1 Cantools Monitor
+
+Outra maneira de visualizar o dado no barramento CAN é pelo 
+`python3 -m cantools monitor -c can0 -B 250000 ../DBC/BRELETmotorV3.dbc`
 
 
 Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação rede CAN com BBB e Python <https://www.embarcados.com.br/can-com-beaglebone-black-e-python/>
@@ -979,9 +1063,18 @@ Para o J1939 e PGN veja Borth TF. Analisando os Impactos do Uso do Protocolo Can
 
 
 
-## Algoritmo do On Board Computer
+## 5.2. Algoritmo do On Board Computer
 
-Vamos colocar usar as mensagens do J1939 para mandar os dados do Controlador do Motor para o computador de bordo
+O programa no computador de borde tem que ser mais que somente ler os dados do barramento CAN e visualiza-lo.
+
+Temos que fazer uma análise dos dados, de onde vem e quem vai usar, e ver se é necessário algum tipo de processamento.
+
+Outra coisa importante é a taxa de amostragem (cycle time) de cada dado. 
+O próprio protocolo J1939 define o cycle time para cada variavel. 
+
+Eu ainda não sei como tratar a questão dos cycle time de uma forma estruturado no OBC.
+
+Para implementar a leitura e filtragem das mensagens vamos usar a biblioteca `python-can` 
 
 | Mensagem         | Origem | Destino | PGN   | descrição  |
 |:----------------:|:------:|:-------:|:-----:|:----------:|
@@ -1002,6 +1095,31 @@ Monitorando barramento de baixa velocidade
 - Tensão secundárias
 
 Visualizando dados no display.
+
+## 5.3. CAN J1939 para Modbus-IP
+
+O computador de bordo tem que implementar a ponte entre o CAN e o ScadaBR. 
+Para isso os dados recebidos pelo CAN serão mapeados como registradores no MODBUS. 
+
+O Modbus-IP do ScadaBR tem uma limitação de velocidade de leitura e transmissão de dados. Nosso caso vamos padronizar a atualização a uma frequencia de 3 vezes por segundo, uma taxa compatível com nossa capacidade de acompanhar o fenômeno. 
+
+Caso se precisa de analisar o transiente, pode ser fazer a leitura diretamento do barranto CAN com outras ferramentas.
+
+Ou seja, o datasource do ScadaBR é atualizada 3 vezes por segundo.
+
+
+| Variavel         | Origem | Modbus-IP | Tipo | 
+|:-----------------|:-------|:---------:|:----:|
+| Velocity         | MODINSTRUM | 1000  | Holding Register |    
+| Tensao bateria   | BMS    | 1001      | Holding Register |
+| Corrente bateria | BMS    | 1002      | Holding Register |
+| Rotaçao motor    | EVEC1  |           | Holding Register |
+| Forward          | EVEC2  |  xxx      | Bit |  
+| Backward         | EVEC2  |  xxx      | Bit |      
+| Brake            | EVEC2  |  xxx      | Bit |  
+| Stop             | EVEC2  |  xxx      | Bit |  
+| Ready            | EVEC2  |  xxx      | Bit |  
+
 
 
 

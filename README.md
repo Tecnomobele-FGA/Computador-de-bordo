@@ -37,7 +37,7 @@ A tabela a seguir mostra a proposta de uso dos periféricos do Pocket Beagle.
 | CAN 1   | ainda nao ligado fisicamente  | P2 - 9,8    | Ainda não |
 | USB     | WiFi Dongle     | P1 - 5,7,9,11,13,15 | Implementado |
 | UART0   | Acesso ao Beagle pelo serial com terminal | P1 - 30, 32 | Implementado |
-| UART 2  | Serial GPS      | P1 - 8,10 | Ainda nãp |
+| UART 2  | Serial GPS      | P1 - 8,10 | Ainda não |
 | UART 4  | Serial LoRa Radio | P2 5,7 | Ainda não
 
 
@@ -258,6 +258,65 @@ Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figu
 | GND     | P1  | 15   | GND | 4    |
 
 ![](figuras/Beagle_wifi_config.jpg)
+
+
+## 2.4. Módulo GPS Ublox 7
+
+* Alimentação: de 3,3 V à 5 V DC
+* Corrente de operação: entre 35 mA e 50 mA
+* Comunicação serial/TTL 3.3V
+* Antena embutida
+
+
+| Pino | 	Função no GPS | Ligação Beagle |
+|:----:|:--------------:|:--------------:|
+| 1	 | Vcc            | Vcc |
+| 2	 | GND   | GND |
+| 3	| TX out | RX2 pino Px-yy |
+| 4	| RX in  | TX2 pino Px-yy |
+
+Detalhamento da comunicação. O formato do Protocolo de comunicação NMEA0183.
+
+* Cada início de mensagem começa com o símbolo cifrão(\$).
+* Os próximos 5 caracteres indicam a origem da mensagem, sendo dois para a origem e três para o tipo de mensagem.
+* Todos os campos dos dados são delimitados por vírgulas.
+* O primeiro caractere do último campo deve ser um asterisco (*).
+* O asterisco é seguido de um checksum de dois dígitos em hexadecimal
+* A mensagem é terminada com um Nova Linha ( <CR><LF> ou "\n" ).
+
+
+
+![](fotos/modulo_GPS.jpg)
+
+## 2.5. Módulo Radio 
+
+Para implementar o radio enlace entre a estação rádio base e a boia de sinalização foi adquirido o Módulo RF Wireless LoRa 433MHz.
+
+* Módulo Wifi LoRa E32-TTL-100
+* Controlador SX1278
+* Tecnologia de comunicação LoRa®
+* Tensão de alimentação: 2.3 à 5.5VDC
+* Nível de comunicação: 5.2V (máximo)
+* Distância de transmissão: 3000m (máximo)
+* Potência máxima: 2dB (100mW)
+* Sensibilidade do receptor:-130dBm @ 1.2Kbps
+* Taxa de transferência: 2.4Kbps
+* Conector para antena SMA
+* Corrente de emissão: 130mA @ 100mW
+* Corrente de recepção: 13.5mA @ Mode 0, Mode 1
+* Corrente em 10. Sleep Current:2.0uA (M1=1,M1=0)
+* Interface de comunicação: UART
+* Suporte a RSSI
+* Frequencia de operação: 410MHz a 441MHz (Padrão 433MHz)
+* Temperatura de operação: -30 ~ 85°C
+* Dimensões: 50 x 21 x 10 mm
+
+	O módulo promete um alcance da tecnologia LoRa em torno de 3 à 4Km em área urbana, e aproximadamente 12Km em áreas rurais, distância que pode variar dependendo de obstáculos, paredes, topologia do terreno, etc.
+	Está sendo montado uma instalação no campus Gama para testar essa tecnologia e confirmar o seu alcance. A figura a seguir mostra a descrição dos pinos do módulo.
+	
+	![](figuras/Pinos_LoRa.jpg)
+
+
 
 # 3. Comunicação no barramento CA - Camadas superiores
 

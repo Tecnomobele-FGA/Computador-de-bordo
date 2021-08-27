@@ -174,15 +174,8 @@ Para testar se os canais CAN estão funcionando, pode fazer o teste com o loopba
 
 ### 2.2.1 Ligando CAN no DB9
 
-Vamos padronizar o conector CAN do Beagle com um DB9 macho com os seguintes pinos.
-
-
-| Transciever | DB9 | 
-|:-----------:|:---:|
-| CANL        | 5   |
-| CANH        | 3   | 
-
-Essa configuração de pinagem é compativel com a placa Arduino CAn Shield da Sparkfun e o cabo DB9-OBDII que a acompanha.
+Tem dois padrões de ligação do conector CAN no DB9. 
+Um padrão é compativel com a placa Arduino CAN Shield da Sparkfun e o cabo DB9-OBDII que a acompanha.
 
 O Cabo tem a seguinte pinagem  OBDII para DB9 Femea.
 
@@ -202,8 +195,20 @@ O Cabo tem a seguinte pinagem  OBDII para DB9 Femea.
 
 Tem que ter cuidado de não ligar o DB9 para uma porta serial RS232 convencional, pois os pinos de GND e TX e RX com tensão +de 12 e -12v vão diratemente no transciever. 
 
-Há um outro padrão de pinagem CAN para DB9, mas eu ainda não descobri de onde que vem esta definição. 
-Por enquanto vamos manter a padronização, para manter a compatibilidade com cabo DB9-OBDII. 
+Há um outro padrão de pinagem CAN para DB9, mas eu ainda não descobri de onde que vem esta definição.
+
+Vamos usar este padrão novo, pois o cabo OBDII-DB9 a gente dificilmente vai usar no carro elétrico.
+
+Dessa forma o conector CAN do Beagle com um DB9 macho terá os seguintes pinos: 
+
+
+| Transciever | DB9 | 
+|:-----------:|:---:|
+| CANL        | ?5   |
+| CANH        | ?3   | 
+| GND         |  |
+
+
 
 
 ### 2.2.2 Testando com can-utils
@@ -263,6 +268,8 @@ Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figu
 
 ## 2.4. Módulo GPS Ublox 7
 
+O módulo GPS tem as seguintes características.
+
 * Alimentação: de 3,3 V à 5 V DC
 * Corrente de operação: entre 35 mA e 50 mA
 * Comunicação serial/TTL 3.3V
@@ -273,8 +280,8 @@ Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figu
 |:----:|:--------------:|:--------------:|
 | 1	 | Vcc            | Vcc |
 | 2	 | GND   | GND |
-| 3	| TX out | RX2 pino Px-yy |
-| 4	| RX in  | TX2 pino Px-yy |
+| 3	| TX out | RX4 pino P2-05 |
+| 4	| RX in  | TX4 pino P2-07 |
 
 Detalhamento da comunicação. O formato do Protocolo de comunicação NMEA0183.
 
@@ -285,9 +292,65 @@ Detalhamento da comunicação. O formato do Protocolo de comunicação NMEA0183.
 * O asterisco é seguido de um checksum de dois dígitos em hexadecimal
 * A mensagem é terminada com um Nova Linha ( <CR><LF> ou "\n" ).
 
-
+A figura a seguir mostro o módulo GPS ligado no computador de bordo.
 
 ![](fotos/modulo_GPS.jpg)
+
+
+Este módulo foi ligado a porta Serial UART 4 do Pocket Beagle.
+Para verificar se as portas serias estão devidamente instaladas e habilitados na versão do sistema operacional do Pocket Beagle, podemos verificar isso com o seguinte comando:
+
+```
+debian@beaglebone:~$ dmesg | grep tty
+[    0.000000] Kernel command line: console=ttyO0,115200n8 root=/dev/mmcblk0p1 ro rootfstype=ext4 rootwait coherent_pool=1M net.ifnames=0 lpj=1990656 rng_core.default_quality=100 quiet
+[    0.001786] WARNING: Your 'console=ttyO0' has been replaced by 'ttyS0'
+[    1.201568] 44e09000.serial: ttyS0 at MMIO 0x44e09000 (irq = 30, base_baud = 3000000) is a 8250
+[    1.211685] console [ttyS0] enabled
+[    1.212940] 48022000.serial: ttyS1 at MMIO 0x48022000 (irq = 31, base_baud = 3000000) is a 8250
+[    1.213937] 48024000.serial: ttyS2 at MMIO 0x48024000 (irq = 32, base_baud = 3000000) is a 8250
+[    1.214879] 481a8000.serial: ttyS4 at MMIO 0x481a8000 (irq = 33, base_baud = 3000000) is a 8250
+debian@beaglebone:~$ 
+```
+
+Conforme a listagem podemos confirmar que a porta ttyS4 está instalada nessa versão do software. 
+Entretanto é necessária habiltar os pinos do UART 4 do PocketBeagle por meio do comando config-pin
+
+```
+debian@beaglebone:~$ config-pin -l P2_05
+
+Available modes for P2_05 are: default gpio gpio_pu gpio_pd gpio_input uart
+debian@beaglebone:~$ config-pin P2_05 uart
+debian@beaglebone:~$ config-pin P2_07 uart
+
+```
+
+Para testar se o GPS está comunicando com o PocketBeagle pode-se usar por exemplo o programa Minicom, configura-lo para ttyS4, 9600 bps, 8N1, e dessa forma deve aparecer a seguinte tela, onde a cada segundo a informação do GPS é atualizada. 
+
+```
+Welcome to minicom 2.7.1
+
+OPTIONS: I18n 
+Compiled on May  6 2018, 10:36:56.
+Port /dev/ttyS4, 12:19:54
+
+Press CTRL-A Z for help on special keys
+
+$GPRMC,,V,,,,,,,,,,N*53
+$GPVTG,,,,,,,,,N*30
+$GPGGA,,,,,,0,00,99.99,,,,,,*48
+$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30
+$GPGSV,1,1,01,05,,,23*7C
+$GPGLL,,,,,,V,N*64
+$GPRMC,,V,,,,,,,,,,N*53
+$GPVTG,,,,,,,,,N*30
+$GPGGA,,,,,,0,00,99.99,,,,,,*48
+$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30
+$GPGSV,1,1,02,05,,,23,06,,,24*7F
+
+```
+### 2.4.1 Datalogger para registrar rota 
+O seguinte programa registra a rota a uma amostragem de 1 hz.
+
 
 ## 2.5. Módulo Radio 
 
@@ -317,6 +380,15 @@ Para implementar o radio enlace entre a estação rádio base e a boia de sinali
 	
 	![](figuras/Pinos_LoRa.jpg)
 
+| Pino | 	Nome do Pino |Função LoRa | Ligação Beagle |
+|:----:|:--------------:|:--------------:|:---:|
+| 1	 | M0  | Entrada - Configura modo operação | GND |
+| 2	 | M1  | Entrada - Configura modo operação | GND |
+| 3	 | RxD | Entrada - receptor uart  | TxD |
+| 4	 | TxD | Saída - transmissor uart | RxD |
+| 5	 | AUX | Saída - indicação de estado do módulo | |
+| 6	 | Vcc | Alimentação 3.3v ou 5V | 5 vcc|
+| 7	 | GND | comun  | GND |
 
 
 # 3. Comunicação no barramento CA - Camadas superiores
@@ -1202,3 +1274,6 @@ Borth TF. Analisando os Impactos do Uso do Protocolo Can FD em Aplicações Auto
 ![](figuras/tab_pgn_03.jpg)
 
 ![](figuras/tab_pgn_04.jpg)
+
+![](figuras/tab_pgn_gps.jpg)
+[link J1939 GPS](https://copperhilltech.com/blog/sae-j1939-gps-application-with-arduino-due-delivers-pgn-65267-vehicle-position/)

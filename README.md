@@ -361,7 +361,7 @@ $GPGSV,1,1,02,05,,,23,06,,,24*7F
 
 ```
 ### 2.4.1 Datalogger para registrar rota 
-O seguinte programa registra a rota a uma amostragem de 1 hz.
+O programa para registra os dados do GPS e (ou a rota ou percurso) do veículo a uma amostragem de 1 hz está no [subdiretório deste repositório](./Datalogger_Scada/README.md).
 
 
 ## 2.5. GSM SIM800L  

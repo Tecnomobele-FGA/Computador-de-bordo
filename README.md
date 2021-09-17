@@ -15,6 +15,11 @@ A figura a seguir mostra o diagrama do bloco do computador de bordo com display 
 
 Entretanto, há uma versão mais nova que foi lançada recentemente que é mais compacto (e barato). O PocketBeagle, tem toda a funcionalidade do BBB, mas diversos conectores físicos dos interfaces da BBB foram retiradas e também foi retidada a interface HDMI. 
 
+```
+$uname -a
+Linux beaglebone 4.19.94-ti-r50 #1buster SMP PREEMPT Mon Aug 24 23:03:55 UTC 2020 armv7l GNU/Linux
+```
+
 Para implementar a proposta foi necessário ligar um transciever CAN para  adequar os sinais cmos do Beagle ao padrão do barramento CAN. Este módulo é alimentado com 3.3V podendo ser diretamente ligado no barramento de expansão do Beagle.
 
 O Beagle funcionará como ponte entre as duas redes CAN e a rede TCP-IP. A partir da rede TCP-IP pode-se ter acesso ao Beagle permitindo a sua monitoração remoto ou re-programação.
@@ -36,9 +41,11 @@ A tabela a seguir mostra a proposta de uso dos periféricos do Pocket Beagle.
 | CAN 0   | Barramento CAN  | P1 - 26, 28 | Implementado |
 | CAN 1   | ainda nao ligado fisicamente  | P2 - 9,8    | Ainda não |
 | USB     | WiFi Dongle     | P1 - 5,7,9,11,13,15 | Implementado |
-| UART0   | Acesso ao Beagle pelo serial com terminal | P1 - 30, 32 | Implementado |
-| UART 2  | Serial GPS      | P1 - 8,10 | Ainda não |
-| UART 4  | Serial LoRa Radio | P2 5,7 | Ainda não
+| UART 0  | Acesso ao Beagle pelo serial com terminal | P1 - 30, 32 | Implementado |
+| UART 2  | GSM SIM800L    | P1 - 8,10,12 | Ainda não |
+| UART 4  | Serial GPS     | P2 - 5,7 | implementado |
+| Battery | Litium 18650   | P2 - 14,16 | Implementado | 
+| GPIO    | Chaves para GND | P2 - 2,4 | Montada | 
 
 
 ## 2.1 Acessando o PocketBealge
@@ -76,7 +83,6 @@ O PocketBeagle pode ser accessado na USB pelo comando:
 `ssh debian@192.168.6.2`  ou `ssh debian@beaglebone.local` 
 
 e a senha padrão do Beagle é `temppwd` 
-
 
 ## 2.2 Configurando a interface CAN
 
@@ -251,7 +257,7 @@ Há uma vasta documentação técnica sobre o uso do SocketCan em sistemas opera
 
 Para facilitar o desenvolvimento no Pocket Beagle é necessário colocar o Beagle diretamente na internet sem usar a porta USB do computador hospedeiro. 
 
-Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figura a seguir.
+Para configurar o WiFi Dongle foi usado o `connmanctl` conforme mostrado na figura a seguir.
 
 
 | Beagle  | con | pino | USB | pino |
@@ -264,6 +270,12 @@ Para configurar o Wifi Dongle foi usado o `connmanctl` conforme mostrado na figu
 | GND     | P1  | 15   | GND | 4    |
 
 ![](figuras/Beagle_wifi_config.jpg)
+
+O funcionamento do USB WiFi Dongle ficou meio devagar com o tempo. 
+Quando logo pelo ssh ele demora alguns segundos para processar os comandos. 
+Não sei se foi a inclusão de outras portas seriais ou se há a necessidade de desligar as outras portas USB.
+
+Aparentemente o WiFi dongle está esquentando além do normal. Pode ser um problema neste modelo de dongle que está dos antigos.
 
 
 ## 2.4. Módulo GPS Ublox 7
@@ -352,43 +364,79 @@ $GPGSV,1,1,02,05,,,23,06,,,24*7F
 O seguinte programa registra a rota a uma amostragem de 1 hz.
 
 
-## 2.5. Módulo Radio 
+## 2.5. GSM SIM800L  
 
-Para implementar o radio enlace entre a estação rádio base e a boia de sinalização foi adquirido o Módulo RF Wireless LoRa 433MHz.
+Módulo GPRS GSM SIM800L 
 
-* Módulo Wifi LoRa E32-TTL-100
-* Controlador SX1278
-* Tecnologia de comunicação LoRa®
-* Tensão de alimentação: 2.3 à 5.5VDC
-* Nível de comunicação: 5.2V (máximo)
-* Distância de transmissão: 3000m (máximo)
-* Potência máxima: 2dB (100mW)
-* Sensibilidade do receptor:-130dBm @ 1.2Kbps
-* Taxa de transferência: 2.4Kbps
-* Conector para antena SMA
-* Corrente de emissão: 130mA @ 100mW
-* Corrente de recepção: 13.5mA @ Mode 0, Mode 1
-* Corrente em 10. Sleep Current:2.0uA (M1=1,M1=0)
-* Interface de comunicação: UART
-* Suporte a RSSI
-* Frequencia de operação: 410MHz a 441MHz (Padrão 433MHz)
-* Temperatura de operação: -30 ~ 85°C
-* Dimensões: 50 x 21 x 10 mm
+Especificações:
 
-	O módulo promete um alcance da tecnologia LoRa em torno de 3 à 4Km em área urbana, e aproximadamente 12Km em áreas rurais, distância que pode variar dependendo de obstáculos, paredes, topologia do terreno, etc.
-	Está sendo montado uma instalação no campus Gama para testar essa tecnologia e confirmar o seu alcance. A figura a seguir mostra a descrição dos pinos do módulo.
-	
-	![](figuras/Pinos_LoRa.jpg)
+* CI SIM800L;
+* Frequências: EGSM900, DCS1800, GSM850, PCS1900;
+* GPRS Data Downlink: 85.6 kbps (máximo);
+* GPRS Data Uplink: 85.6 kbps (máximo);
+* Suporte PAP (password authentication protocol) para conexões PPP;
+* Protocolo TCP/IP embutido;
+* Serial: 1200 bps à 115.200 bps;
+* Temperatura de operação: -40 à 85°C;
+* Dimensões: 21 x 15 x 3,2mm.
 
-| Pino | 	Nome do Pino |Função LoRa | Ligação Beagle |
-|:----:|:--------------:|:--------------:|:---:|
-| 1	 | M0  | Entrada - Configura modo operação | GND |
-| 2	 | M1  | Entrada - Configura modo operação | GND |
-| 3	 | RxD | Entrada - receptor uart  | TxD |
-| 4	 | TxD | Saída - transmissor uart | RxD |
-| 5	 | AUX | Saída - indicação de estado do módulo | |
-| 6	 | Vcc | Alimentação 3.3v ou 5V | 5 vcc|
-| 7	 | GND | comun  | GND |
+
+![](fotos/GSM_sim80L.png)
+
+
+
+
+| Pino | 	Nome do Pino |Função | Ligação Beagle | Pino |
+|:----:|:--------------:|:--------------:|:---:|:----|
+| 1 | Vcc | Alimentação 3.3v  | 3.3V do LM317 | null |
+| 2	 | RST | Reset | GPIO | P1-12 |
+| 3	 | RxD | Entrada - receptor uart  | TxD UART 2 |P1-08|
+| 4	 | TxD | Saída - transmissor uart | RxD UART 2 |P1-10|
+| 5	 | GND | comun  | GND | GND |
+
+
+Configurando os pinos do Pocket Beagle para habilitar UART 2 usando 
+
+```
+$ config-pin -l P1.08
+$ config-pin P1.08 uart
+$ config-pin P1.10 uart
+```
+
+
+
+[datasheet do SIM800L](https://cdn.awsli.com.br/78/78150/arquivos/sim800l-datasheet.pdf)
+
+
+Os comandos AT para usar o GPRS para mandar dados via internet são:
+
+[exemplo no tutorial](https://www.youtube.com/watch?v=7GtfhTVDIc0)
+
+```
+AT+SAPBR=3,1,"APN","CMNET"
+AT+SAPBR=1,1
+AT+SAPBR=2,1
+AT+HTTPINIT
+AT+HTTPPARA="CID",1
+AT+HTTPPARA="URL","http://192.168.1.77:8080/ScadaBR/httpds?bat_tensao=11.1"
+AT+HTTPACTION=0
+AT+HTTPREAD
+AT+HTTPTERM
+AT+SAPBR=0,1
+
+```
+
+Descobri qual é o problema que essa ação não funciona:
+
+* O numero IP está na minha rede local de casa e o numero IP do GSM GPRS está numa outra subrede do provedor. 
+* Vai ser necessário ter um IP fixo geral do servidor ScadaBR para que essa configuração funciona.
+
+
+## 2.6. Bateria Litium 18650
+
+A bateria Litium 18650 foi ligado aos pinos P2.14 e GND junto com um resistor no pino P2.16  e GND para simular a função do termistor. 
+
+Não houve a necessadade de configuração específico da função de UPS. O funcionamento é automática. 
 
 
 # 3. Comunicação no barramento CA - Camadas superiores

@@ -418,7 +418,7 @@ AT+SAPBR=1,1
 AT+SAPBR=2,1
 AT+HTTPINIT
 AT+HTTPPARA="CID",1
-AT+HTTPPARA="URL","http://192.168.1.77:8080/ScadaBR/httpds?bat_tensao=11.1"
+AT+HTTPPARA="URL","http://164.41.92.20:8080/ScadaBR/httpds?bat_litium_ups=3.7"
 AT+HTTPACTION=0
 AT+HTTPREAD
 AT+HTTPTERM
@@ -426,18 +426,35 @@ AT+SAPBR=0,1
 
 ```
 
-Descobri qual é o problema que essa ação não funciona:
+A primeira vez quando mandou o comando o servidor ScadaBR recebeu os dados e consegui mostrar o valor encaminhado. 
+Na segunda vez deu o servidor retornou um erro 601. Falta analisar todos os comandos AT do GPRS e avaliar essa funcionalidade do modem.
 
-* O numero IP está na minha rede local de casa e o numero IP do GSM GPRS está numa outra subrede do provedor. 
-* Vai ser necessário ter um IP fixo geral do servidor ScadaBR para que essa configuração funciona.
 
 
 ## 2.6. Bateria Litium 18650
+
+O Pocket Beagle tem um circuito de carga linear e gerenciamento de bateria de integrado. O *Linear charge and power path management system* do Pocket Beagle é baseado no por um circuito de alimentação da bateria, um sensor de temperatura que permite a entrada de um termistor de 10K e o circuito está integrada com o botão de reset do pocket beagle.
+
 
 A bateria Litium 18650 foi ligado aos pinos P2.14 e GND junto com um resistor no pino P2.16  e GND para simular a função do termistor. 
 
 Não houve a necessadade de configuração específico da função de UPS. O funcionamento é automática. 
 
+Essa bateria de 3.800 mAh é capaz de segurar o funcionameno do Beagle durante algumas horas.
+
+![](fotos/OBC_completo.jpg)
+
+A entrada de P2.14 permite uma tensão de entrada de 3,7V de uma bateria Litium e o Pocket Beagle gera internamente 3.3 V para seu funcionamento. 
+
+As saidas 3.3V do Pocket também são alimentados, então por exemplo os módulos GPS e CAN funcionam normalmente com essa bateria.
+
+Quando o OBC está sendo alimentado com 5V, o bateria é carregada automáticamente e quando a tensão de 5V é retirada a bateria assume automaticamente a alimentação do Pocket Beagle. 
+
+Para desligar o OBC deve-se então apertar o botão de reset. 
+
+Quando se liga o o Pocket Beagle à bateria, o sistema só inicia o boot quando apertar o botão de reset. 
+
+Deve ter alguma funcionalidade de monitorar a tensão da bateria já embutido no Linux, mas eu ainda não descobri os detalhes do seu acesso e funcionamento.
 
 # 3. Comunicação no barramento CA - Camadas superiores
 

@@ -10,7 +10,13 @@ Quando o servidor e o OBC não estão na mesma subrede, o protocolo HTTP Recieve
 
 Escolheu-se 1 Hz por ser também a taxa de envio do bloco de dados do GPS pelo protocolo NMEA. 
 
-Para resolver isso, escolheu programar o OBC para fazer o seu registro de dados num banco de dados locais, e permitir fazer o upload dos dados no ScadaBR, assim que o veículo estiver no alcance da rede local.
+Para resolver isso, escolheu-se programar o OBC de modo a também fazer o seu registro de dados num banco de dados locais, e permitir fazer o upload dos dados no ScadaBR, assim que o veículo estiver no alcance da rede local.
+
+Ou seja, o ScadaBR vai ter duas maneiras para carregar os dados do OBC:
+
+1. Em tempo real por meio de protocolos tipo Modbus quando estão em rede;
+2. No modo assincrona carregando os dados armazenados da base local por meio de uma rotina de upload parametrizado; 
+
 
 Procurou-se neste desenvolvimento aproveitar ao máximo as funcionalidades já presentes no ScadaBR e o Linux, reduzindo o desenvolvimento de programas específicos ao mínimo possível.
  
@@ -46,7 +52,7 @@ Depois da instalação eu usei o seguinte script para fazer a configuração
 $ sudo mysql_secure_installation 
 ```
 
-#2. Criando o primeiro acesso no MariaDB
+## 1.1. Criando o primeiro acesso no MariaDB
 
 [Baseado neste tutoria 2](https://phoenixnap.com/kb/how-to-create-mariadb-user-grant-privileges)
 
@@ -56,7 +62,7 @@ Apos instalado o MariaDB ainda tem uma confusão de como entrar. `mysql -u root 
 Consegui somente com `sudo mysql -u root`
 
 
-## 2.1. Criando usuário 
+## 1.2. Criando usuário 
 
 ```
 > create user 'debian'@localhost identified by 'sleutel';
@@ -67,7 +73,7 @@ Consegui somente com `sudo mysql -u root`
 ```
 
 
-## 2.2. Alimentando a base de dados
+## 1.3. Alimentando a base de dados
 Agora pode entrar com usuario normal 
  
 ```
@@ -110,7 +116,7 @@ Mais detalhes da configuração do ScadaBR para fazer essa varredura e upload do
 
 
 
-#3. Configurando acesso remoto no Beagle
+## 1.4. Configurando acesso remoto no Beagle
 Uma vez definido o banco de dados e sua estrutura o próximo passo é permitir o acesso ao banco.
 
 A primeira tentativa de acesso remoto fiz com o programa [DBEAVER](https://dbeaver.io) e ao colocar os dados do 
@@ -140,8 +146,29 @@ Para resolver isso, teve que voltar a entrar no MariaDB como root e inserir os s
 
 Com isso foi possivel acessar o banco de dados a partir do dBeaver.
 
-# 4. Configurando ScadaBR
-Para permitir o acesso pelo ScadaBR tive que também habilitar o endereço do IP do servidor no MariaDB e com isso conseguimos acesar o banco de daods conforme mostrada na figura a seguir.
+# 2. Configurando ScadaBR
+
+Um sistema supervisório coomo ScadaBR foi desenvolvido para fazer a leitura de diversos equipamentos em tempo real , com taxas de atualização ou amostragem programáveis e diversos opções de protocolos de comunicação para realizar a sua tarefa.
+
+Ao configurar um *data source* se define a sua taxa de atualização e o protoloco de comunicação que será utilizado.
+
+Para monitorar os dados online vamos usar o protocolo MODBUS-IP e todas funcionalidades próprios do ScadaBR. 
+
+Entretanto, para a opção de upload assincrona, a ScadaBR não fornece suporte nato para isso, mas temos algumas opções no ScadaBR para implementar isso.
+
+A estratégia é usar a possibilidade de buscar dados pelo protocolo SQL no banco de dados do MariaDB. 
+
+## 2.1. Configuração do acesso de ScadaBR ao MariaDB no OBC
+
+Para permitir o acesso pelo ScadaBR tive que também habilitar o endereço do IP do servidor no MariaDB e com isso conseguimos acesar o banco de dadods.
+
+```
+> grant all privileges on *.* to 'debian'@'endereco.IP.do.ScadaBR' identified by 'sleutel';
+> flush privileges;
+```
+
+O proximo passo foi configurar um *data source*  do tipo SQL conforme mostrada na figura a seguir, com a taxa de atualização, os dados de acesso ao banco de dados e a sentença SQL que será encaminhado para o servidor de banco de dados cada vez que completar o tempo de atualização.
+
 
 ![](figuras/Tela_ScadaBR_SQL.jpg)
 
@@ -150,21 +177,101 @@ Importante destacar na hora de configurar o datasource que os dados devem ser or
 Dessa forma a busca executado pela sentença SQL `select * from dados;`
 faz a varredura do banco de dados, fazendo a busca das variáveis e atribui o valor e o `timestamp` nas colunas de cada registro. 
 
-A vantagem dessa abordagem é que permite depois customizar a busca, modificando a sentença do SQL. 
+O resultado dessa sentença SQL depois é linkado aos *data points* que são motrados na figura a seguir, onde o *Row identifier* indica qual o dado da setença SQL será ligado à variável do ScadaBR.
 
 Até descobrir os detalhes levou uns três dias hackeando o ScadaBR.
 
-## 3.1. SQL query no ScadaBR
+![](figuras/Tela_ScadaBR_datapoints.jpg)
 
-Ainda há um problema para resolver. 
-Quando a base de dados começa a encher, o query `select * from dados;` pode retornar centenas de registros. 
-O problema é que dentro do ScadaBR somente os primeiros 50 registros são processados. 
+A vantagem dessa abordagem é que permite depois customizar a busca, modificando a sentença do SQL. Por exemplo, pode se fazer uma busca de dados usando um filtro e assim evitar ler dados não necessários.
 
-O desafio é de montar um query que retorna sempre as últimas 50 registros
+```
+select * from dados where hora > "2021-09-16 09:52:53"
+```
+ou 
+
+```
+select * from dados where valor < 1;
+```
+
+## 2.1. Upload dos banco MariaDB usando SQL no ScadaBR
+
+Como mencionado na introdução deste texto, o ScadaBR não tem suporte para fazer o upload de um grande bloco de informação de forma assíncrona.
+
+A senteça SQL ou o *select statement* do protocolo SQL está limitado a receber 50 registros por vez. 
+Isso pode ser um problema quando base de dados começa a encher. Com uma taxa de amostragem dos dados no OBC de 1 segundo, em menos de 1 minuto já se preencheu a capacidade de upload do ScadaBR.
+
+A cada sentença SQL somente os primeiros 50 registros são processados e o resto dos registros é descartada. 
+
+O desafio é implementar uma maneira para buscar todos os dados armazenados no OBC a partir de um script no ScadaBR ou implementando um protocolo de trasnsferência de dados simples, quebrando o banco em blocos de 50 registros que serão carregados com o SQL.
+
+O desafio é aproveitar o máximo as potencialidades do MariaDB e ScadaBR e o mínimo de programação extra. 
 
 
-# 5. Programando o Python para alimentar o banco do dados
+* Cria uma tabela de sinais e comandos no MariaDB;
+* Sincroniza essa tabela de sinais e comandos com datasource SQL criando um datapoints para comandar o upload;
+* Cria uma area de buffer no MariaBD com uma cópia da tabela de registros
+* Cria uma tela no ScadaBR com o comando de iniciar o upload e algumas variaveis para parametrizar a busca de dados
+
+A da tela pode ter o seguinte layout.
+
+![](figuras/Tela_upload.jpg)
+
+
+Do lado OBC cria um programa que monitora o comando upload no banco e começa a preencher a area de buffer e dessa forma comandar o processo de transferencia de dados.
+
+Isso pode ser um program aparte em Python que ao receber o comando de upload e o intervalo de horário dos dados solicitados, seleciona os primeiros 50 registros da tabela de dados e os copia para a area de buffer e espera o ScadaBR fazer a busca. Depois os proximos 50 registros são copiados e assim sucessivamente até todos os dados selecionados são mandados. 
+
+Dessa form, toda a programação é feito num script simples no python no OBC, aproveitando toda a estrutura do ScadaBR.
+
+
+
+# 3. Programação do OBC em Python 
 
 A primeira tentativa de usar o banco de dados foi feito usando o SQLite3 que é uma versão simplificado do SQL. Foi importante ter usado lo para se acostumar com o SQL no Beagle e testar a programação em Python. 
 
+
+## 3.1. Programa para armazenar os dados no MariaDB
+
+Programa envocado por alguma chave no OBC ou comando via terminal para iniciar a amostragem e armazenamento.
+
+A rotina principal em Python é a cada segundo ler o GPS e inserir os valores na tabela `dados` .
+
+```
+conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
+curs = conn.cursor()
+myGPS=GPS()
+while True:
+    Dia = datetime.date.today()
+    Hora =datetime.datetime.now()
+    myGPS.read()
+    if (myGPS.coordenados == 1) : 
+        Latitude =  myGPS.msg.lat
+        Longitude = myGPS.msg.lon
+        Velocidade = myGPS.msg.spd_over_grnd
+        s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
+        print (s)
+        if Latitude != '' :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("latitude", Latitude, Hora))
+        if Longitude != '' :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("longitude", Longitude, Hora))
+        if Velocidade != None :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("velocidade", Velocidade, Hora))        
+        conn.commit()
+        time.sleep(1)
+        # Atualiza os registradores do ModBUS-IP
+
+```
+
+
+Este algoritmo, além de mandar os registros para o banco de dados locais, compartilha os dados medidos do GPS para os registradores do protocolo Modbus-IP. 
+
+
+O ideal seria ter alguma maneira de amarrar essa rotina a uma interrupção por software em vez de usar o `time.sleep(1)`. 
+
+Ainda não descobri como fazer isso de forma elegante no Linux e Python, mas deve ter uma maneira bem simples e robusto de fazer isso.
+
+## 3.2. Programa para fazer o upload do banco
+
+Programa que fica monitorando o comando de upload do banco e sincronizar a transferência de dados.
 

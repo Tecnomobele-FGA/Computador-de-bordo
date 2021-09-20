@@ -198,12 +198,13 @@ select * from dados where valor < 1;
 
 Como mencionado na introdução deste texto, o ScadaBR não tem suporte para fazer o upload de um grande bloco de informação de forma assíncrona.
 
-A senteça SQL ou o *select statement* do protocolo SQL está limitado a receber 50 registros por vez. 
-Isso pode ser um problema quando base de dados começa a encher. Com uma taxa de amostragem dos dados no OBC de 1 segundo, em menos de 1 minuto já se preencheu a capacidade de upload do ScadaBR.
+A senteça SQL ou o *select statement* do protocolo SQL faz a busca de todos os dados registrados da tabela no banco de dados. 
+Isso pode ser um problema quando base de dados começa a encher. Com uma taxa de amostragem dos dados no OBC de 1 segundo, em menos de 1 minuto já se preencheu 180 registros no MariaDB.
 
-A cada sentença SQL somente os primeiros 50 registros são processados e o resto dos registros é descartada. 
+Isso pode sobrecarregar o processamento do mysql no Pocket Beagle e o canal de comunicação entre o servidor ScadaBR e o OBC.
 
-O desafio é implementar uma maneira para buscar todos os dados armazenados no OBC a partir de um script no ScadaBR ou implementando um protocolo de trasnsferência de dados simples, quebrando o banco em blocos de 50 registros que serão carregados com o SQL.
+O desafio é implementar uma maneira para buscar todos os dados armazenados no OBC a partir de um script no ScadaBR, otimizando assim a capacidade de processamento do OBC e o canal de comunicação. 
+Ou seja, precisa se implementar um protocolo de trasnferência de dados simples, que manda os dados sob demanda usando o SQL.
 
 O desafio é aproveitar o máximo as potencialidades do MariaDB e ScadaBR e o mínimo de programação extra. 
 
@@ -213,14 +214,11 @@ O desafio é aproveitar o máximo as potencialidades do MariaDB e ScadaBR e o m�
 * Cria uma area de buffer no MariaBD com uma cópia da tabela de registros
 * Cria uma tela no ScadaBR com o comando de iniciar o upload e algumas variaveis para parametrizar a busca de dados
 
-A da tela pode ter o seguinte layout.
-
-![](figuras/Tela_upload.jpg)
 
 
-Do lado OBC cria um programa que monitora o comando upload no banco e começa a preencher a area de buffer e dessa forma comandar o processo de transferencia de dados.
+Do lado OBC cria um programa em Python que monitora o comando upload no banco e começa a preencher a area de buffer e dessa forma comandar o processo de transferencia de dados.
 
-Isso pode ser um program aparte em Python que ao receber o comando de upload e o intervalo de horário dos dados solicitados, seleciona os primeiros 50 registros da tabela de dados e os copia para a area de buffer e espera o ScadaBR fazer a busca. Depois os proximos 50 registros são copiados e assim sucessivamente até todos os dados selecionados são mandados. 
+Isso pode ser um program aparte em Python, que ao receber o comando de upload e o intervalo de horário dos dados solicitados, seleciona os registros da tabela de dados que atendem à requsiação e os copia para a area de buffer e espera o ScadaBR fazer a busca.
 
 Dessa form, toda a programação é feito num script simples no python no OBC, aproveitando toda a estrutura do ScadaBR.
 
@@ -228,16 +226,63 @@ Dessa form, toda a programação é feito num script simples no python no OBC, a
 
 # 3. Programação do OBC em Python 
 
-A primeira tentativa de usar o banco de dados foi feito usando o SQLite3 que é uma versão simplificado do SQL. Foi importante ter usado lo para se acostumar com o SQL no Beagle e testar a programação em Python. 
+A programação do OBC é organizado para ter programas curtos em Python 
+
+1. Captar os dados do GPS e registra-los no MariaDB e disponibilizar o ultimo dado lido pelo ModBus-IP
+2. Fazer a transferência de um bloco de dados regsitrados no MariaDB para o ScadaBR
+3. Ler os dados do CAN e registra-los no MariaDB e disponibiliza-los no ModBus-IP com a taxa de amostragem definidos pelo protocolo CAN (J1939 ou CANOPEN)
 
 
 ## 3.1. Programa para armazenar os dados no MariaDB
 
-Programa envocado por alguma chave no OBC ou comando via terminal para iniciar a amostragem e armazenamento.
+Programa envocada por alguma chave no OBC ou comando via terminal para iniciar a amostragem e armazenamento.
 
-A rotina principal em Python é a cada segundo ler o GPS e inserir os valores na tabela `dados` .
+A rotina principal em Python é ler o GPS e inserir os valores na tabela `dados`. O GPS atualiza os dados a cada segundo e os encaminha na porta serial usando o protocolo NMEA.
+
+
+A rotina que decodifica o protocolo NMEA á 
 
 ```
+import os
+import time
+import datetime
+import sys
+import requests
+import serial
+import pynmea2
+
+ser = serial.Serial("/dev/ttyS4",9600, timeout=0.5)
+
+class GPS:
+    def __init__ (self):
+        ser.flushInput()
+        ser.flushInput()
+    def read(self):
+        self.coordenados=0
+        if (ser.inWaiting()!=0):
+            G = ser.readline()
+            self.error=0
+            if G != b'' :
+                #self.NMEA = G
+                Gs = G.strip()
+                Gd = Gs.decode(encoding='UTF-8',errors='replace')
+                self.NMEA=Gd
+                Gd_vetor = Gd.split(',')
+                self.code = Gd_vetor[0]
+                if Gd_vetor[0]== '$GPRMC':  # '$GPGGA':
+                    self.coordenados=1
+                    try :
+                        self.msg = pynmea2.parse(Gd)
+                    except : self.error = 1
+```
+
+
+A rotina central que le o GPS e armazena os dados é:
+
+```
+import mysql.connector
+from pyModbusTCP.server import ModbusServer, DataBank
+
 conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
 curs = conn.cursor()
 myGPS=GPS()
@@ -275,3 +320,78 @@ Ainda não descobri como fazer isso de forma elegante no Linux e Python, mas dev
 
 Programa que fica monitorando o comando de upload do banco e sincronizar a transferência de dados.
 
+Criando uma tabela no MariaDB com os variaveis que irão controlar o upload. Essa tabela, diferente da tabela que registra os dados não está organizado na forma de *Row-based query* como a tabela dos registros dos dados.
+
+```
+> create table upload (id tinyint, com_upload tinyint, h_inicial timestamp, h_final timestamp , tamanho int);
+> insert into upload values (1, 0, "2021-09-19 12:35:00", "2021-09-19 12:35:00", 0); 
+> update upload set h_final = "2021-09-19 12:33:00"  where id=1;
+```
+
+No lado do ScadaBR a configuração do `data source` é o seguinte 
+
+![](figuras/Tela_Scada_Config_upload.jpg)
+
+O detalhamento dos `datapoints` é dado na tela a seguir. 
+
+![](figuras/Tela_Scada_Config_upload_update.jpg)
+
+Com isso pode se comandar o upload com a seguinte tela interativa com o seguinte layout.
+
+![](figuras/Tela_upload.jpg)
+
+O programa em Python que faz a transferência precisa ler o comando que inicia a transferência e o intervalo de dados.
+Depois deve ser feito uma seleção no MariaDB e colocar os regsitros solicitados numa tabela de upload.
+
+A tabela `buffer_upload` é criado com a seguinte sentença SQL. 
+
+```
+> create table buffer_upload (nome VARCHAR(100), valor float, hora timestamp);
+```
+
+A rotina em Python no arquivo `upload_sql_01.py` copia os registros da tabela `dados` e disponibiliza na tabela `buffer_upload`.
+
+```
+#!/usr/bin/env python3
+# Rotina ler dados do MariaDB e mandar para ScadaBR via SQL 
+
+import os
+import time
+import datetime
+import sys
+import mysql.connector
+
+#########
+# Abrir banco de dados
+#########
+
+conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
+curs = conn.cursor()
+
+query = ("SELECT h_inicial FROM upload WHERE id = 1")
+curs.execute(query)
+resultado1 = curs.fetchall()
+inicio = resultado1[0][0]
+print ("Inicio = ",inicio)
+
+query = ("SELECT h_final FROM upload WHERE id = 1")
+curs.execute(query)
+resultado2 = curs.fetchall()
+fim = resultado2[0][0]
+print ("Final = ", fim)
+
+query = ("SELECT * FROM dados "
+         "WHERE hora BETWEEN %s AND %s")
+curs.execute(query, (inicio, fim))
+
+resultado = curs.fetchall()
+
+for x in resultado:
+    print("Inserindo no buffer = ",x[0]," , ", x[1]," , " ,x[2])
+    curs.execute("INSERT INTO buffer_upload (nome, valor, hora) values (%s , %s, %s)",(x[0],x[1], x[2]))
+    
+conn.commit()
+
+``` 
+
+Ainda falta arrumar a lógica do disparo do programa e sincronizar o ScadaBR com a rotina Python, e tem um bug ainda que muda de vez em quando o tempo inicial da selecao, quando é atualizada na tela interativa do ScadaBR. Em vez de colocar o valor correto, de alguma forma é colocado o horário do sistema operacional.

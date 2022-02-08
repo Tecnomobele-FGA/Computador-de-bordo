@@ -84,6 +84,33 @@ O PocketBeagle pode ser accessado na USB pelo comando:
 
 e a senha padrão do Beagle é `temppwd` 
 
+
+### 2.1.3 Configurado Cloud9 IDE 
+Uma opção de acessar o Beagle é usando o Cloud9 IDE. Essa opção habilitado quando ligar o Beagel pela porta USB ao computador, e depois acessando o endereço `http://192.162.6.2 no browser do computador (mac os ou linux).
+
+A interface do Cloud9 é muito bom e tem diversos programas exemplos direcionado para o Beagle. 
+
+Uma limitação é que ele aponto para o endereço `var/lib/clouds` e não para a nossa area de trabalho no Debian.
+
+Para mudar isso tem um tutorial no [link](https://paulbupejr.com/change-cloud9-workspace/)
+
+O procedimento consiste em criar um override do `systemctl edit cloud9` e colocar no arquibo o seguinte conteudo 
+
+```
+[Service]
+ExecStart=
+ExecStart=/usr/bin/nodejs server.js --packed -w /home/debian/src
+```
+
+Depois precisa reiniciar o servico 
+
+```
+systemctl daemon-reload
+systemctl restart cloud9
+```
+
+
+
 ## 2.2 Configurando a interface CAN
 
 No sistema operacional Linux  convencional as especificidades do hardware são de certa forma incorporadas no Kernel, mas este sistemática se mostrou impraticável com as placas ARM. Por isso foi introduzido a estrutura de Device Tree para que o computador Beagle saiba qual hardware e periféricos estão fisicamente instalados na placa. Veja o artigo de Mateus Gagliardi: Introdução ao uso de Device Tree e Device Tree Overlay em Sistemas Linux Embarcado. 2015. <https://www.embarcados.com.br/device-tree-linux-embarcado/>

@@ -86,15 +86,15 @@ e a senha padrão do Beagle é `temppwd`
 
 
 ### 2.1.3 Configurado Cloud9 IDE 
-Uma opção de acessar o Beagle é usando o Cloud9 IDE. Essa opção habilitado quando ligar o Beagel pela porta USB ao computador, e depois acessando o endereço `http://192.162.6.2 no browser do computador (mac os ou linux).
+Uma opção de acessar o Beagle é usando o Cloud9 IDE. Essa opção é habilitado quando ligar o Beagel pela porta USB ao computador, e pode ser acessado por meio de um browser pelo endereço `http://192.162.6.2 do computador (mac os ou linux).
 
 A interface do Cloud9 é muito bom e tem diversos programas exemplos direcionado para o Beagle. 
 
-Uma limitação é que ele aponto para o endereço `var/lib/clouds` e não para a nossa area de trabalho no Debian.
+Uma limitação é que ele aponto para o endereço `/var/lib/clouds` e não para a nossa area de trabalho no Debian.
 
 Para mudar isso tem um tutorial no [link](https://paulbupejr.com/change-cloud9-workspace/)
 
-O procedimento consiste em criar um override do `systemctl edit cloud9` e colocar no arquibo o seguinte conteudo 
+O procedimento consiste em criar um override do `systemctl edit cloud9` e colocar no novo arquivo criado o seguinte conteudo 
 
 ```
 [Service]
@@ -109,6 +109,10 @@ systemctl daemon-reload
 systemctl restart cloud9
 ```
 
+Ao acessar o IDE do Cloud9 no browser terá como diretório atual o 
+```
+/home/debian/src
+```
 
 
 ## 2.2 Configurando a interface CAN
@@ -237,9 +241,9 @@ Dessa forma o conector CAN do Beagle com um DB9 macho terá os seguintes pinos:
 
 | Transciever | DB9 | 
 |:-----------:|:---:|
-| CANL        | ?5   |
-| CANH        | ?3   | 
-| GND         |  |
+| CANL        | 2   |
+| CANH        | 7   | 
+| GND         | 3   |
 
 
 

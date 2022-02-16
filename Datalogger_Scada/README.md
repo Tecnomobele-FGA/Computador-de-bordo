@@ -209,7 +209,35 @@ import requests
 import serial
 import pynmea2
 
+import Adafruit_BBIO.GPIO as GPIO
+import time
+
+pin_led1   = "P2_8"
+pin_chave1 = "P2_2"
+pin_chave2 = "P2_4"
+pin_chave3 = "P2_6"
+ 
+
 ser = serial.Serial("/dev/ttyS4",9600, timeout=0.5)
+
+class painel:
+    def __init__(self): 
+        GPIO.setup(pin_led1, GPIO.OUT)
+        GPIO.setup(pin_chave1, GPIO.IN, GPIO.PUD_UP)
+        GPIO.setup(pin_chave2, GPIO.IN, GPIO.PUD_UP)
+        GPIO.setup(pin_chave3, GPIO.IN, GPIO.PUD_UP)
+    def read(self):
+        if GPIO.input(pin_chave1) : self.chave1=1
+        else: self.chave1=0
+        if GPIO.input(pin_chave2) : self.chave2=1
+        else: self.chave2=0
+        if GPIO.input(pin_chave3) : self.chave3=1
+        else: self.chave3=0        
+    def liga_led1(self):        
+        GPIO.output(pin_led1, GPIO.HIGH)
+    def desliga_led1(self):
+        GPIO.output(pin_led1, GPIO.LOW)
+
 
 class GPS:
 	def __init__ (self):
@@ -240,27 +268,37 @@ class GPS:
 conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
 curs = conn.cursor()
 myGPS=GPS()
+Painel = painel()
+
 
 while True:
-    Dia = datetime.date.today()
-    Hora =datetime.datetime.now()
-    myGPS.read()
-    if (myGPS.coordenados == 1) : 
-        Latitude =  myGPS.msg.lat
-        Longitude = myGPS.msg.lon
-        Velocidade = myGPS.msg.spd_over_grnd
-        horario = myGPS.msg.timestamp   ## falta testar.. !!!
-        s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
-        print (s)
-        if Latitude != '' :
-            if Longitude != '' :
-                curs.execute("INSERT INTO registro_GPS (hora, latitude, longitude , velocidade) values (%s , %s, %s, %s)",(Hora, Latitude, Longitude, Velocidade))
-                conn.commit()
+    Painel.read()
+    if Painel.chave1 :
+        Painel.liga_led1()
+        Dia = datetime.date.today()
+        Hora =datetime.datetime.now()
+        myGPS.read()
+        if (myGPS.coordenados == 1) : 
+            Latitude =  myGPS.msg.lat
+            Longitude = myGPS.msg.lon
+            Velocidade = myGPS.msg.spd_over_grnd
+            horario = myGPS.msg.timestamp   ## falta testar.. !!!
+            s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
+            print (s)
+            if Latitude != '' :
+                if Longitude != '' :
+                    curs.execute("INSERT INTO registro_GPS (hora, latitude, longitude , velocidade) values (%s , %s, %s, %s)",(Hora, Latitude, Longitude, Velocidade))
+                    conn.commit()
+    else :
+        Painel.desliga_led1() 
         # Atualiza os registradores do ModBUS-IP
+
 ```
 
+O programa no OBC só grava os dados no banco quando a chave alavanca na caixa do OBC está habilitado. 
+Ainda falta colocar este programa para ser chamado pelo `crontab` para que é iniciado pelo boot do sistema.
 
-
+*Falta ainda gravar o dado de altitude do GPS* 
 
 
 A rotina antigo que grava para ScadaBR: 

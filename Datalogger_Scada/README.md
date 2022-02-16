@@ -272,6 +272,7 @@ Painel = painel()
 
 
 while True:
+	 time.sleep(0.01)
     Painel.read()
     if Painel.chave1 :
         Painel.liga_led1()

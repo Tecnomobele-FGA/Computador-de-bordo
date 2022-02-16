@@ -1,30 +1,33 @@
 # Data logger pocket beagle - raspberry para ScadaBR
 
-Este tutorial mostra o passo a passo para criar um datalogger no Pocket Beagle que permite que a gente guarda dados do GPS (coordenados e velocidade), dados do funcionamento do carro (Velocidade linear, corrente e tensão elétrica) num banco de dados no Beagle, e permite depois descarregar todos estes dados de forma automático no ScadaBR. 
+Este tutorial mostra o passo a passo para criar um datalogger no Pocket Beagle que permite que a gente guarda dados do GPS (coordenados e velocidade), dados do funcionamento do carro (Velocidade linear, corrente e tensão elétrica) num banco de dados no Beagle, e permite depois descarregar todos estes dados de forma automático no ScadaBR ou num outro ambiente de analisar os dados off-line, como por exemplo Octave ou Jupyter. 
+
+
+* Operação on-line usando ScadaBR
+* Operação off-line (armazenando num banco local) usando Jupyter Notebook
+
+Para resolver isso, escolheu-se programar o OBC de modo a também fazer o seu registro de dados num banco de dados locais, e permitir fazer o upload dos dados no ScadaBR, assim que o veículo estiver no alcance da rede local.
+
+Neste sentido, escolheu se para o banco de dados usar o MySQL no OBC e usar o protocolo SQL do ScadaBR. 
+
+# 1. Operação on-line usando ScadaBR
+
+A primeira versão deste trabalho focou somente no ScadaBR como ambiente, mas agora vamos separar o uso do ScadaBR somente para situações de análise on-line usando os protocolos já embarcados no ScadaBR. 
 
 O ScadaBR já permite várias formas de puxar os dados do Computado de Bordo ou OBC implementado pelo Pocket Beagle, usando os protocolos MODBUS-RTU, MODBUS-IP ou HTTP Reciever.
 
 Cada uma desses protocolos tem suas vantagens e desvantagens e conseguimos bons resultados com MODBUS-IP quando usamos uma rede local ou WiFi entre o servidor ScadaBR e o OBC. 
 
-Quando o servidor e o OBC não estão na mesma subrede, o protocolo HTTP Reciever funcionou, entretanto, o tempo de processamento e  transmissão fica em torno de alguns segundos. Isso, torna este protocolo inviavel para operações de uma tempo de amostragem de 1 Hz como é no caso do monitoramento do veículo. 
+Quando o servidor e o OBC não estão na mesma subrede, o protocolo HTTP Reciever funcionou, entretanto, o tempo de processamento e  transmissão fica em torno de alguns segundos. Isso, torna este protocolo não muito apropriado para operações de uma tempo de amostragem de 1 Hz como é no caso do monitoramento do veículo. 
 
 Escolheu-se 1 Hz por ser também a taxa de envio do bloco de dados do GPS pelo protocolo NMEA. 
-
-Para resolver isso, escolheu-se programar o OBC de modo a também fazer o seu registro de dados num banco de dados locais, e permitir fazer o upload dos dados no ScadaBR, assim que o veículo estiver no alcance da rede local.
-
-Ou seja, o ScadaBR vai ter duas maneiras para carregar os dados do OBC:
-
-1. Em tempo real por meio de protocolos tipo Modbus quando estão em rede;
-2. No modo assincrona carregando os dados armazenados da base local por meio de uma rotina de upload parametrizado; 
 
 
 Procurou-se neste desenvolvimento aproveitar ao máximo as funcionalidades já presentes no ScadaBR e o Linux, reduzindo o desenvolvimento de programas específicos ao mínimo possível.
  
-Neste sentido, escolheu se para o banco de dados usar o MySQL no OBC e usar o protocolo SQL do ScadaBR. 
 
 
-
-#1. Configuração do MariaBD no Beagle
+# 2. Configuração do MariaBD no Beagle
 
 O banco de dados escolhido foi o MariaDB que é uma versão compatível com MySQL. 
 
@@ -52,7 +55,7 @@ Depois da instalação eu usei o seguinte script para fazer a configuração
 $ sudo mysql_secure_installation 
 ```
 
-## 1.1. Criando o primeiro acesso no MariaDB
+## 2.1. Criando o primeiro acesso no MariaDB
 
 [Baseado neste tutoria 2](https://phoenixnap.com/kb/how-to-create-mariadb-user-grant-privileges)
 
@@ -62,7 +65,7 @@ Apos instalado o MariaDB ainda tem uma confusão de como entrar. `mysql -u root 
 Consegui somente com `sudo mysql -u root`
 
 
-## 1.2. Criando usuário 
+## 2.2. Criando usuário 
 
 ```
 > create user 'debian'@localhost identified by 'sleutel';
@@ -73,7 +76,7 @@ Consegui somente com `sudo mysql -u root`
 ```
 
 
-## 1.3. Alimentando a base de dados
+## 2.3. Alimentando a base de dados
 Agora pode entrar com usuario normal 
  
 ```
@@ -88,6 +91,29 @@ Depois de entrar no ambiente pode se criar a base de dados e abri-lo para uso.
 > use base_GPS;
 ```
 
+
+### 2.3.1. Opção para Jupyter Notebook
+Cada leitura do GPS fornece os dados do relógio do próprio GPS, os coordenados geograficos e a velocidade de deslocamento. 
+A leitura é atualizada a cada segundo pelo GPS. Pode-ser que os dados do GPS não são válidos, pois não há visibilidade do GPS fazer o processamento. Neste caso o dados não deve ser gravado no banco.
+
+
+Pode-se criar uma tabela que tem como o proprio *datestamp* como indice e três campos (latitude, longitude e velocidade).   
+
+```
+MariaDB [base_GPS]> create table  registro_GPS (hora timestamp, latitude float, longitude float, velocidade float); 
+MariaDB [base_GPS]> insert into registro_GPS values ( now(), 1549.66900 , 04803.60211 , 1.32);
+MariaDB [base_GPS]> select * from registro_GPS;
++---------------------+----------+-----------+------------+
+| hora                | latitude | longitude | velocidade |
++---------------------+----------+-----------+------------+
+| 2022-02-16 01:38:30 |  1549.67 |    4803.6 |       1.32 |
++---------------------+----------+-----------+------------+
+
+```
+
+Ainda falta nessa configuração pegar o timestamp do GPS em vez da hora do sistema operacional. 
+
+### 2.3.2. Opção para ScadaBR (obsoleto) 
 O próximo passo é a criação da tabela com os dados monitorados pelo OBC. 
 Depois de varias tentativas pesquisando a melhor opção de fazer a integração entre MariaDB e ScadaBR chegamos a seguinte configuração.
 
@@ -116,7 +142,7 @@ Mais detalhes da configuração do ScadaBR para fazer essa varredura e upload do
 
 
 
-## 1.4. Configurando acesso remoto no Beagle
+## 2.4. Configurando acesso remoto no Beagle
 Uma vez definido o banco de dados e sua estrutura o próximo passo é permitir o acesso ao banco.
 
 A primeira tentativa de acesso remoto fiz com o programa [DBEAVER](https://dbeaver.io) e ao colocar os dados do 
@@ -146,7 +172,147 @@ Para resolver isso, teve que voltar a entrar no MariaDB como root e inserir os s
 
 Com isso foi possivel acessar o banco de dados a partir do dBeaver.
 
-# 2. Configurando ScadaBR
+# 3. Programação do OBC em python usando o MariaDB 
+
+
+A programação do OBC é organizado para ter programas curtos em Python 
+
+1. Captar os dados do GPS a uma taxa de 1 Hz e registra-los no MariaDB e disponibilizar o ultimo dado lido pelo ModBus-IP
+2. Ler os dados do CAN e registra-los no MariaDB e disponibiliza-los no ModBus-IP com a taxa de amostragem definidos pelo protocolo CAN (J1939 ou CANOPEN)
+
+
+Para inspecionar a base de dados no MariaDB pode se entrar com `mysql -p` e a senha `sleutel`.
+Para ver as tabelas no ambiente mysql use as seguintes comandos:
+
+```
+MariaDB [(none)]> show databases;
+MariaDB [(none)]> use base_GPS;
+MariaDB [base_GPS]> show tables;
+```
+
+
+## 3.1. Programa para armazenar os dados no MariaDB
+
+Programa envocada por alguma chave no OBC ou comando via terminal para iniciar a amostragem e armazenamento.
+
+A rotina principal em Python é ler o GPS e inserir os valores na tabela `registro_GPS`. O GPS atualiza os dados a cada segundo e os encaminha na porta serial usando o protocolo NMEA.
+
+```
+import mysql.connector
+from pyModbusTCP.server import ModbusServer, DataBank
+
+import os
+import time
+import datetime
+import sys
+import requests
+import serial
+import pynmea2
+
+ser = serial.Serial("/dev/ttyS4",9600, timeout=0.5)
+
+class GPS:
+	def __init__ (self):
+		ser.flushInput()
+		ser.flushInput()
+	def read(self):
+		while (ser.inWaiting()==0):
+			time.sleep(0.01)
+			pass
+		G = ser.readline()
+		self.error=0
+		self.coordenados=0
+		if G != b'' :
+			#self.NMEA = G
+			Gs = G.strip()
+			Gd = Gs.decode(encoding='UTF-8',errors='replace')
+			self.NMEA=Gd
+			Gd_vetor = Gd.split(',')
+			self.code = Gd_vetor[0]
+			if Gd_vetor[0]== '$GPRMC':  # '$GPGGA':
+				#self.coordenados=1
+				try :
+					self.msg = pynmea2.parse(Gd)
+					self.coordenados=1
+				except : self.error = 1
+
+
+conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
+curs = conn.cursor()
+myGPS=GPS()
+
+while True:
+    Dia = datetime.date.today()
+    Hora =datetime.datetime.now()
+    myGPS.read()
+    if (myGPS.coordenados == 1) : 
+        Latitude =  myGPS.msg.lat
+        Longitude = myGPS.msg.lon
+        Velocidade = myGPS.msg.spd_over_grnd
+        horario = myGPS.msg.timestamp   ## falta testar.. !!!
+        s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
+        print (s)
+        if Latitude != '' :
+            if Longitude != '' :
+                curs.execute("INSERT INTO registro_GPS (hora, latitude, longitude , velocidade) values (%s , %s, %s, %s)",(Hora, Latitude, Longitude, Velocidade))
+                conn.commit()
+        # Atualiza os registradores do ModBUS-IP
+```
+
+
+
+
+
+A rotina antigo que grava para ScadaBR: 
+
+```
+import mysql.connector
+from pyModbusTCP.server import ModbusServer, DataBank
+
+conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
+curs = conn.cursor()
+myGPS=GPS()
+while True:
+    Dia = datetime.date.today()
+    Hora =datetime.datetime.now()
+    myGPS.read()
+    if (myGPS.coordenados == 1) : 
+        Latitude =  myGPS.msg.lat
+        Longitude = myGPS.msg.lon
+        Velocidade = myGPS.msg.spd_over_grnd
+        s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
+        print (s)
+        if Latitude != '' :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("latitude", Latitude, Hora))
+        if Longitude != '' :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("longitude", Longitude, Hora))
+        if Velocidade != None :
+            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("velocidade", Velocidade, Hora))        
+        conn.commit()
+        # time.sleep(1)
+        # Atualiza os registradores do ModBUS-IP
+
+```
+
+
+Este algoritmo, além de mandar os registros para o banco de dados locais, compartilha os dados medidos do GPS para os registradores do protocolo Modbus-IP. 
+
+A rotina é executada cada vez que tem um dados válido na porta serial no protocolo NMEA. A princípio o GPS manda os dados a cada segundo, entretanto quando não tem dado válido o registro é descartado.
+
+Com isso vamos ter somente dados válidos e uma taxa de registro de no máximo 1 Hz. 
+
+*Essa estrutura não está legal, pois ocupa muito espaço. Vamos muda-lo para um registro com um timestamp e os dados de velocidade e os coordenados num único registro. Essa versão ainda tem a dificuldade do ScadaBR para a operação off-line*
+
+
+
+# 4. Operação off-line com Jupyter
+
+Depois de brigar um tempão com ScadaBR para usa-lo com a operação off-line, resolvi passar para uma plataforma mais flexível com o ambiente Jupyter Notebook com sua programação em python. A grande vantágem dessa plataforma é a sua flexibilidade e já temos alguns programas de visualização dos dados geográficos. 
+[https://github.com/Tecnomobele-FGA/SimuladorCarroEletrico](https://github.com/Tecnomobele-FGA/SimuladorCarroEletrico)
+
+Além disso, também temos um app [https://tecnomobele-unb.web.app/#/ ](https://tecnomobele-unb.web.app/#/) desenvolvido para processar os dados que foram gravados no banco de dados.
+
+# 5. Operação off-line com ScadaBR (obsoleto)
 
 Um sistema supervisório coomo ScadaBR foi desenvolvido para fazer a leitura de diversos equipamentos em tempo real , com taxas de atualização ou amostragem programáveis e diversos opções de protocolos de comunicação para realizar a sua tarefa.
 
@@ -158,7 +324,7 @@ Entretanto, para a opção de upload assincrona, a ScadaBR não fornece suporte 
 
 A estratégia é usar a possibilidade de buscar dados pelo protocolo SQL no banco de dados do MariaDB. 
 
-## 2.1. Configuração do acesso de ScadaBR ao MariaDB no OBC
+## 5.1. Configuração do acesso de ScadaBR ao MariaDB no OBC
 
 Para permitir o acesso pelo ScadaBR tive que também habilitar o endereço do IP do servidor no MariaDB e com isso conseguimos acesar o banco de dadods.
 
@@ -194,7 +360,7 @@ ou
 select * from dados where valor < 1;
 ```
 
-## 2.1. Upload dos banco MariaDB usando SQL no ScadaBR
+## 5.1. Upload dos banco MariaDB usando SQL no ScadaBR
 
 Como mencionado na introdução deste texto, o ScadaBR não tem suporte para fazer o upload de um grande bloco de informação de forma assíncrona.
 
@@ -224,99 +390,7 @@ Dessa form, toda a programação é feito num script simples no python no OBC, a
 
 
 
-# 3. Programação do OBC em Python 
-
-A programação do OBC é organizado para ter programas curtos em Python 
-
-1. Captar os dados do GPS e registra-los no MariaDB e disponibilizar o ultimo dado lido pelo ModBus-IP
-2. Fazer a transferência de um bloco de dados regsitrados no MariaDB para o ScadaBR
-3. Ler os dados do CAN e registra-los no MariaDB e disponibiliza-los no ModBus-IP com a taxa de amostragem definidos pelo protocolo CAN (J1939 ou CANOPEN)
-
-
-## 3.1. Programa para armazenar os dados no MariaDB
-
-Programa envocada por alguma chave no OBC ou comando via terminal para iniciar a amostragem e armazenamento.
-
-A rotina principal em Python é ler o GPS e inserir os valores na tabela `dados`. O GPS atualiza os dados a cada segundo e os encaminha na porta serial usando o protocolo NMEA.
-
-
-A rotina que decodifica o protocolo NMEA á 
-
-```
-import os
-import time
-import datetime
-import sys
-import requests
-import serial
-import pynmea2
-
-ser = serial.Serial("/dev/ttyS4",9600, timeout=0.5)
-
-class GPS:
-    def __init__ (self):
-        ser.flushInput()
-        ser.flushInput()
-    def read(self):
-        self.coordenados=0
-        if (ser.inWaiting()!=0):
-            G = ser.readline()
-            self.error=0
-            if G != b'' :
-                #self.NMEA = G
-                Gs = G.strip()
-                Gd = Gs.decode(encoding='UTF-8',errors='replace')
-                self.NMEA=Gd
-                Gd_vetor = Gd.split(',')
-                self.code = Gd_vetor[0]
-                if Gd_vetor[0]== '$GPRMC':  # '$GPGGA':
-                    self.coordenados=1
-                    try :
-                        self.msg = pynmea2.parse(Gd)
-                    except : self.error = 1
-```
-
-
-A rotina central que le o GPS e armazena os dados é:
-
-```
-import mysql.connector
-from pyModbusTCP.server import ModbusServer, DataBank
-
-conn = mysql.connector.connect(user='debian', password='sleutel' , host='127.0.0.1', database='base_GPS')
-curs = conn.cursor()
-myGPS=GPS()
-while True:
-    Dia = datetime.date.today()
-    Hora =datetime.datetime.now()
-    myGPS.read()
-    if (myGPS.coordenados == 1) : 
-        Latitude =  myGPS.msg.lat
-        Longitude = myGPS.msg.lon
-        Velocidade = myGPS.msg.spd_over_grnd
-        s = "%s" % Hora + " , " + "%s" % Latitude + " , " + "%s" % Longitude + " , " +  "%s" % Velocidade
-        print (s)
-        if Latitude != '' :
-            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("latitude", Latitude, Hora))
-        if Longitude != '' :
-            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("longitude", Longitude, Hora))
-        if Velocidade != None :
-            curs.execute("INSERT INTO dados (nome, valor, hora) values (%s , %s, %s)",("velocidade", Velocidade, Hora))        
-        conn.commit()
-        time.sleep(1)
-        # Atualiza os registradores do ModBUS-IP
-
-```
-
-
-Este algoritmo, além de mandar os registros para o banco de dados locais, compartilha os dados medidos do GPS para os registradores do protocolo Modbus-IP. 
-
-
-O ideal seria ter alguma maneira de amarrar essa rotina a uma interrupção por software em vez de usar o `time.sleep(1)`. 
-
-Ainda não descobri como fazer isso de forma elegante no Linux e Python, mas deve ter uma maneira bem simples e robusto de fazer isso.
-
-## 3.2. Programa para fazer o upload do banco
+## 5.2. Programa para fazer o upload do banco
 
 Programa que fica monitorando o comando de upload do banco e sincronizar a transferência de dados.
 

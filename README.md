@@ -308,6 +308,27 @@ Não sei se foi a inclusão de outras portas seriais ou se há a necessidade de 
 
 Aparentemente o WiFi dongle está esquentando além do normal. Pode ser um problema neste modelo de dongle que está dos antigos.
 
+### 2.3.1. Endereço IP fixo no wifi
+Para manter um IP fixo no beagle podemos configurar por meio do `connmanctl` a configuração da rede wifi. 
+Na distribuição DEBIAN que estamos usando não temos os arquivos de configuração da rede na pasta `/etc/wpa_supplicant/` como a gente encontre no Raspberry Zero com sua distribuição linux.
+
+No Beagle com Debian, aparentemente as configuracoes estão nos diretórios na pasta `/var/lib/connman/`. 
+Cada diretório corresponde a uma das configurações dos wifi já usados no sistema. Neste diretório há o arquivo `settings` com a configuração.
+
+Achie num tutorial na internet uma maneira para configurar este arquivo `settings` para ter um IP Fixo. 
+
+```
+IPv4.method=manual                ←Method to be used (in this case manual IP)
+IPv4.netmask_prefixlen=24
+IPv4.local_address=192.168.0.133  ←Desired IP address
+IPv4.gateway=192.168.0.1
+Passphrase=<PASS>                 ←Wifi network password
+AutoConnect=true
+```
+
+Eu ainda não testei, mas vale a pena depois testa-lo e tirar a dificuldade de adivinhar cada vez o endereço IP. 
+Entretanto, deve ter uma maneira de fazer isso diretamento usando o `connmanctl`.
+
 
 ## 2.4. Módulo GPS Ublox 7
 

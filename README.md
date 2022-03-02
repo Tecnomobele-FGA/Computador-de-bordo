@@ -48,6 +48,8 @@ A tabela a seguir mostra a proposta de uso dos periféricos do Pocket Beagle.
 | GPIO    | Chaves para GND | P2 - 2,4 | Montada | 
 
 
+# 2. Configurando o PocketBeagle
+
 ## 2.1 Acessando o PocketBealge
 
 O primeiro passo é configurar o hardware do PocketBeagle para a proposta.
@@ -508,7 +510,7 @@ Quando se liga o o Pocket Beagle à bateria, o sistema só inicia o boot quando 
 
 Deve ter alguma funcionalidade de monitorar a tensão da bateria já embutido no Linux, mas eu ainda não descobri os detalhes do seu acesso e funcionamento.
 
-# 3. Comunicação no barramento CA - Camadas superiores
+# 3. Comunicação no barramento CAN - Camadas superiores
 
 O computador de bordo tem que monitorar o controlador do motor elétrico e o BMS no barramento CAN de alta prioridade (velocidade).
 
@@ -531,7 +533,7 @@ Dessa foram, o computador de bordo só precisa monitorar o barramento e usar as 
 Por exemplo: O protocolo J1939 implementado pelo controlador do motor elétrico manda a cada 40ms informação com a tensão e corrente do motor. O BMS manda também em tempos regulares o estado da bateria, indicando quanto de energia ainda tem disponível. O módulo de instrumentação manda a cada 100ms a informação da velocidade do veículo. Com estes dados, o OBC computador de bordo pode calcular por exemplo qual automia em Km, mantendo o mesmo padrão de direção e mostrar essa informação para o condutor.
 
 
-### Estrutura do J1939
+### 3.1.1. Estrutura do J1939
 
 O J1939 aproveita o identificador do 29 bits do CAN para passar informações específicas do tipo de comunicação. 
 
@@ -1217,7 +1219,51 @@ Falta a informação do cycle time no DBC.
 
 ## 4.5. Dicionário de dados modulo de sinalização 
 
-A definir...
+O módulo de sinalização vai ter o mesmo dicionário do motor EVEC2
+
+```
+  Name:       EVEC2
+  Id:         0x10088a9e
+      Priority:       4
+      PGN:            0x00800
+      Source:         0x9e
+      Destination:    0x8a
+      Format:         PDU 1
+  Length:     8 bytes
+  Cycle time: - ms
+  Senders:    -
+  Layout:
+
+                          Bit
+
+             7   6   5   4   3   2   1   0
+           +---+---+---+---+---+---+---+---+
+         0 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         1 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- Voltage
+           +---+---+---+---+---+---+---+---+
+         2 |------------------------------x|
+           +---+---+---+---+---+---+---+---+
+         3 |<------------------------------|
+           +---+---+---+---+---+---+---+---+
+             +-- Current
+           +---+---+---+---+---+---+---+---+
+         4 |<-----------------------------x|
+           +---+---+---+---+---+---+---+---+
+             +-- Temperature
+           +---+---+---+---+---+---+---+---+
+     B   5 |   |<-x|   |   |<-x|<-x|<-x|<-x|
+     y     +---+---+---+---+---+---+---+---+
+     t           |           |   |   |   +-- Forward
+     e           |           |   |   +-- Backward
+                 |           |   +-- Brake
+                 |           +-- Stop
+                 +-- Ready
+  -------------------------------------------------------------------
+```
+
 
 
 # 5. Python Cantools
@@ -1303,7 +1349,7 @@ Há a opção de plotar ou monitorar.
 ## 5.1 Cantools Monitor
 
 Outra maneira de visualizar o dado no barramento CAN é pelo 
-`python3 -m cantools monitor -c can0 -B 250000 ../DBC/BRELETmotorV3.dbc`
+`python3 -m cantools monitor -c can0 -B 125000 src/DBC/BRELETmotorV2.dbc`
 
 
 Para programação em Python Veja artigo de Bruno Oliveira 2017 - Aplicação rede CAN com BBB e Python <https://www.embarcados.com.br/can-com-beaglebone-black-e-python/>
@@ -1312,9 +1358,19 @@ Para o J1939 e PGN veja Borth TF. Analisando os Impactos do Uso do Protocolo Can
 
 
 
-## 5.2. Algoritmo do On Board Computer
+# 6. Modbus no On Board Computer
 
-O programa no computador de borde tem que ser mais que somente ler os dados do barramento CAN e visualiza-lo.
+O programa no computador de borde tem que ser mais que somente ler os dados do barramento CAN, mas também armazenar e visualiza-los.
+
+Há duas modos de operação.
+ 
+
+* Operação off-line (armazenando os dados do CAN num banco local)
+* Operação on-line com o carro no dinamômetro e visualizando os dados usando ScadaBR 
+
+Aqui será detalhada como os dados serão disponibilizados por meio do Modbus-IP para o ScadaBr do dinamômetro. 
+
+No lado do OBC é implementando um cliente Modbus por meio da biblioteca python pyModbusTCP. 
 
 Temos que fazer uma análise dos dados, de onde vem e quem vai usar, e ver se é necessário algum tipo de processamento.
 
@@ -1325,27 +1381,18 @@ Eu ainda não sei como tratar a questão dos cycle time de uma forma estruturado
 
 Para implementar a leitura e filtragem das mensagens vamos usar a biblioteca `python-can` 
 
-| Mensagem         | Origem | Destino | PGN   | descrição  |
-|:----------------:|:------:|:-------:|:-----:|:----------:|
-| Tensao bateria   | BMS    | todos   |  xx   |            |
-| Corrente bateria | BMS    | todos   |
-| Rotaçao motor    | Controlador motor | 
+| Mensagem                | Origem | 
+|:-----------------------:|:------:|
+| Painel de botoes no OBC | OBC |
+| Tensao bateria de tração  | BMS ou MODINSTRUM  |
+| Corrente bateria de tração  | BMS ou MODINSTRUM |  
+| Velocidade de deslocamento  | MODNSTRUM | 
+| Tensão da bateria auxiliar  | OBC |
 
 
-Máquina de estado do computador de bordo. 
-Monitorando barramento de alta velocidade
 
-- Corrente e tensão do bateria
-- Estado do controlador do motor
- 
-Monitorando barramento de baixa velocidade
 
-- Velocidade, temperatura
-- Tensão secundárias
-
-Visualizando dados no display.
-
-## 5.3. CAN J1939 para Modbus-IP
+## 6.1. CAN J1939 para Modbus-IP
 
 O computador de bordo tem que implementar a ponte entre o CAN e o ScadaBR. 
 Para isso os dados recebidos pelo CAN serão mapeados como registradores no MODBUS. 
@@ -1359,20 +1406,90 @@ Ou seja, o datasource do ScadaBR é atualizada 3 vezes por segundo.
 
 | Variavel         | Origem | Modbus-IP | Tipo | 
 |:-----------------|:-------|:---------:|:----:|
-| Velocity         | MODINSTRUM | 1000  | Holding Register |    
-| Tensao bateria   | BMS    | 1001      | Holding Register |
-| Corrente bateria | BMS    | 1002      | Holding Register |
-| Rotaçao motor    | EVEC1  |           | Holding Register |
-| Forward          | EVEC2  |  xxx      | Bit |  
-| Backward         | EVEC2  |  xxx      | Bit |      
-| Brake            | EVEC2  |  xxx      | Bit |  
-| Stop             | EVEC2  |  xxx      | Bit |  
-| Ready            | EVEC2  |  xxx      | Bit |  
+| Velocity         | MODINSTRUM | 10 | Holding Register |    
+| Tensao bateria   | MODINSTRUM | 11 | Holding Register |
+| Corrente bateria | MODINSTRUM | 12 | Holding Register |
+| chaves1          | OBC    | 10  | Input status Bit |
+| chaves2          | OBC    | 11  | Input status Bit |  
+| chaves3          | OBC    | 12  | Input status Bit |      
+| Led              | OBC    | 13  | Input coil Bit |  
+
+O programa a seguir implementa a conversão dos dados recebidos pelo CAN para Modbu-IP.
+
+```
+#!/bin/python3
+import can 
+import cantools
+from pyModbusTCP.server import ModbusServer, DataBank
+from time import sleep
+from random import uniform
+from PainelObc import painel
+
+print("Dados do DBC")
+db = cantools.database.load_file('../DBC/BRELETmotorV2.dbc')
+print("Abrindo CAN0")
+can_bus=can.interface.Bus(bustype='socketcan', channel='can0', bitrate=125000)
+print("Abrindo Modbus")
+server = ModbusServer("192.168.1.5",5020, no_block=True)
+input_reg_velocidade=10
+input_reg_voltage=11
+input_reg_current=12
+input_status_chaves=10
+Painel = painel()
+voltage=0
+velocidade=0
+current=0
+
+try:
+    print("Iniciando server")
+    server.start()
+    print("Online")
+    sleep(1)
+    while True:
+        sleep(0.01)
+        Painel.read()
+        DataBank.set_bits(input_status_chaves, [Painel.chave1, Painel.chave2, Painel.chave3])
+        mensagem = can_bus.recv(0.0)
+        if mensagem is not None :
+            mm=db.decode_message(mensagem.arbitration_id, mensagem.data) 
+            if mensagem.arbitration_id == db.get_message_by_name('MODINSTRUM').frame_id : 
+                if 'Velocity' in mm :
+                    velocidade=mm["Velocity"]
+                    DataBank.set_words(input_reg_velocidade, [int(velocidade)])    
+            if mensagem.arbitration_id == db.get_message_by_name('EVEC2').frame_id : 
+                if 'Voltage' in mm :
+                    voltage=mm["Voltage"]
+                    DataBank.set_words(input_reg_voltage, [int(voltage)])
+                if 'Current' in mm :
+                    voltage=mm["Current"]
+                    DataBank.set_words(input_reg_current, [int(current)])                                     
+            print("can -> modbus= " + str(velocidade) + " km/h, " + str(voltage) + " V, "+ str(current) + " Amp, " + str([Painel.chave1, Painel.chave2, Painel.chave3]), end = '\r')
+
+except:
+     print("Shutting down")
+     server.stop()
+     print("Off line")
+```
+
+Este programa ainda é bastante lento e há como otimizar o processamento usando as funções de filtro da biblioteca can-tools ou ainda as funções da biblioteca CAN que possam ser executados pelo kernel e não com as rotinas em python. 
+
+Este programa será testado primeiramente no GamaGolfe e depois no BREletrico, já que eles vão usar o mesmo hardware de instrumentação.
+
+## 6.2. ScadaBR Dinamômetro
+
+A primeira versão do diagrama de bloco da bancada de ensaios com o ScadaBR do dinamômetro é mostrado a seguir.
+
+![](figuras/diagrama_dinamometro.jpg)
+
+A tela sinótica do ScadaBR é mostrada a seguir.
+
+![](figuras/tela_sinotica_bancada.png)
 
 
+## 6.3 Implementação dos ciclos NEDEC na bancada de ensaios
 
 
-# 6. Protocolo CANOPEN
+# 7. Protocolo CANOPEN
 
 O motor da WEG VVW500 usa Canopen @ 250000bps e identificação de 11bits.
 

@@ -1,5 +1,7 @@
 # Data logger pocket beagle - raspberry para ScadaBR
 
+link local `Documentos/GitHub/Computador-de-bordo/Datalogger_Scada`
+
 Este tutorial mostra o passo a passo para criar um datalogger no Pocket Beagle que permite que a gente guarda dados do GPS (coordenados e velocidade), dados do funcionamento do carro (Velocidade linear, corrente e tensão elétrica) num banco de dados no Beagle, e permite depois descarregar todos estes dados de forma automático no ScadaBR ou num outro ambiente de analisar os dados off-line, como por exemplo Octave ou Jupyter. 
 
 

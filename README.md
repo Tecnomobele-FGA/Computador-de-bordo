@@ -1,6 +1,10 @@
-# 1. Computador de bordo 
+# OBC - Computador de bordo 
 
 `Documentos/GitHub/Computador-de-bordo`
+
+[github.com/Tecnomobele-FGA/Computador-de-bordo](https://github.com/Tecnomobele-FGA/Computador-de-bordo)
+
+# 1. Apresentação
 
 Escolheu-se para o computador de bordo do BRElétrico o minicomputador *Beagle Bone*. A sua escolha se baseou no fato de ter uma arquitetura apropriado para sistemas embarcadas baseado em num ARM, ter além do processador principal, dois *Programmable Real-time Unit (PRU)* que podem ser usados para alguma necessidade de processamento dedicado e dois controladores CAN já incorporados na sua placa.
 
@@ -509,6 +513,87 @@ Para desligar o OBC deve-se então apertar o botão de reset.
 Quando se liga o o Pocket Beagle à bateria, o sistema só inicia o boot quando apertar o botão de reset. 
 
 Deve ter alguma funcionalidade de monitorar a tensão da bateria já embutido no Linux, mas eu ainda não descobri os detalhes do seu acesso e funcionamento.
+
+
+## 2.7. Display OLED 
+
+Para facilitar a inspecção de funcionamento do Beagle foi colocado um display Oled de 128x32 SSD1306. 
+Como este display tem uma interface i2c e é alimentado com 3.3Volts a montagem pode ser diretamente na porta i2c 1 do Beagle (Testamos com o pocket beagle - falta testar no BBB).
+
+A foto a seguir mostra a montagem.
+
+![](fotos/Foto_Oled.jpg) 
+
+Para configurar os pinos do i2c configuramos os mesmos como o aplicativa config-pin conforme mostrada a seguir.
+
+```
+$ config-pin P2.09 i2c
+$ config-pin P2.11 i2c
+```
+
+O programa para ler o endereço IP e mostrar no display em python é:
+
+```
+from board import SCL, SDA
+import busio
+import adafruit_ssd1306
+import netifaces
+
+font='/home/debian/src/Oled/font5x8.bin'
+
+i2c = busio.I2C(SCL, SDA)
+display = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c)
+
+display.fill(0)
+display.show()
+display.rotate(180)
+
+lista=netifaces.interfaces()
+if 'wlan0' not in lista:
+     display.text("IP= sem wlan0",1, 1, 1,  font_name=font, size=1)
+else: 
+     ad=netifaces.ifaddresses('wlan0')
+     xx=ad[netifaces.AF_INET]
+     d=xx[0]
+     ip=d['addr']
+     display.text("IP="+ip,1, 1, 1,  font_name=font, size=1)
+
+```
+
+O arquivo com o fonte `fontxx8.bin` achei depois de uma busca na internet.
+ 
+O desafio agora é fazer com que este programa em python seja chamada no boot para mostrar o endereço internet atualizada.
+
+Tentamos fazer isso com `crontab`, mas não funcionou de forma satisfatório. Pesquisamos e descartamos também a opção de usar o `init.d` e vamos agora testar com `systemd` baseado nestes links 
+
+[https://tecadmin.net/setup-autorun-python-script-using-systemd/](https://tecadmin.net/setup-autorun-python-script-using-systemd/)
+
+[https://blog.merzlabs.com/posts/python-autostart-systemd/](https://blog.merzlabs.com/posts/python-autostart-systemd/)
+
+Quando criamos um service no `/lib/systemd/system/oled.services` e chamamos o script em python surgiu um problema na importação do python com `import adafruit_ssd1306` 
+O script em python funcionou normalmente, mas a sua chamada pelo `systemctl` deu este erro. 
+
+Essa falha foi resolvido colocando no `oled.service` o usuário e grupo.
+
+```
+debian@beaglebone:~$ cat /lib/systemd/system/oled.service 
+[Unit]
+Description=Oled_Display
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/debian/src/Oled/oled.py
+User=debian
+Group=debian
+
+[Install]
+WantedBy=multi-user.target
+
+
+```
+
+
 
 # 3. Comunicação no barramento CAN - Camadas superiores
 
@@ -1489,7 +1574,17 @@ A tela sinótica do ScadaBR é mostrada a seguir.
 ## 6.3 Implementação dos ciclos NEDEC na bancada de ensaios
 
 
-# 7. Protocolo CANOPEN
+# 8. Comunicação entre processos
+
+Até agora se elaborou no software do OBC como diversos partes independentes, mas para atender as necessidades devemos partir para sincronizar todos esses programas. 
+Isto pode ser feito diretamente no código, fazendo um único programa monolítico, mas o desafio aqui é aproveitar todos os recursos do sistema operacional para fazer algo bastante portátil, modular e elegante. 
+
+Faz se necessário criar um mecanismo de comunicação entre os diversos programas e vamos experimentar para usar o Inter Process Control `dbus` qque já vem no Linux e no python.
+ 
+
+
+
+# Protocolo CANOPEN
 
 O motor da WEG VVW500 usa Canopen @ 250000bps e identificação de 11bits.
 

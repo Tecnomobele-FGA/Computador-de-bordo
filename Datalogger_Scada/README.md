@@ -115,6 +115,8 @@ MariaDB [base_GPS]> select * from registro_GPS;
 
 Ainda falta nessa configuração pegar o timestamp do GPS em vez da hora do sistema operacional. 
 
+Também foinecessário usar em vez de `timestamp` simples a opção com `timestamp(3)` para poder regustrar décimos de segundos. 
+
 ### 2.3.2. Opção para ScadaBR (obsoleto) 
 O próximo passo é a criação da tabela com os dados monitorados pelo OBC. 
 Depois de varias tentativas pesquisando a melhor opção de fazer a integração entre MariaDB e ScadaBR chegamos a seguinte configuração.
@@ -170,6 +172,13 @@ Para resolver isso, teve que voltar a entrar no MariaDB como root e inserir os s
 ```
 > grant all privileges on *.* to 'debian'@'192.168.1.67' identified by 'sleutel';
 > flush privileges;
+```
+
+
+Você pode testar se o acesso funciona com 
+
+```
+SELECT User, Host FROM mysql.user WHERE Host <> 'localhost';
 ```
 
 Com isso foi possivel acessar o banco de dados a partir do dBeaver.
@@ -352,6 +361,16 @@ Depois de brigar um tempão com ScadaBR para usa-lo com a operação off-line, r
 [https://github.com/Tecnomobele-FGA/SimuladorCarroEletrico](https://github.com/Tecnomobele-FGA/SimuladorCarroEletrico)
 
 Além disso, também temos um app [https://tecnomobele-unb.web.app/#/ ](https://tecnomobele-unb.web.app/#/) desenvolvido para processar os dados que foram gravados no banco de dados.
+
+
+# Replicando o banco no meu servidor externo
+
+banco adekusjo_trajetorio
+usuario adekusjo_gamagolf
+senha fga@senha2022
+
+Tentei fazer o acesso com dbeaver mais não deu certo.
+
 
 # 5. Operação off-line com ScadaBR (obsoleto)
 
